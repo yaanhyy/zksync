@@ -1406,7 +1406,7 @@ Checks if Exodus mode must be entered. Exodus mode must be entered in case of cu
 than the oldest of existed priority requests expiration block number.
 
 ```solidity
-triggerExodusIfNeeded() returns (bool)
+activateExodusMode() returns (bool)
 ```
 
 #### Revert blocks
