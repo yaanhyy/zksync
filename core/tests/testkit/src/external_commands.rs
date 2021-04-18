@@ -9,6 +9,7 @@ use web3::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 use zksync_crypto::convert::FeConvert;
 use zksync_crypto::Fr;
+use vlog::info;
 
 #[derive(Debug, Clone)]
 pub struct Contracts {
@@ -20,6 +21,7 @@ pub struct Contracts {
 }
 
 fn get_contract_address(deploy_script_out: &str) -> Option<(String, Address)> {
+    info!("contract:{}", deploy_script_out);
     if let Some(output) = deploy_script_out.strip_prefix("CONTRACTS_GOVERNANCE_ADDR=0x") {
         Some((
             String::from("CONTRACTS_GOVERNANCE_ADDR"),
@@ -98,6 +100,7 @@ pub fn deploy_contracts(use_prod_contracts: bool, genesis_root: Fr) -> Contracts
     let mut contracts = HashMap::new();
     for std_out_line in stdout.split_whitespace().collect::<Vec<_>>() {
         if let Some((name, address)) = get_contract_address(std_out_line) {
+            info!("contract name:{}, address:{}", name, address);
             contracts.insert(name, address);
         }
     }

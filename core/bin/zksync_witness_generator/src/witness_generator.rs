@@ -28,6 +28,7 @@ pub struct WitnessGenerator<DB: DatabaseInterface> {
     block_step: BlockNumber,
 }
 
+#[derive(Debug)]
 enum BlockInfo {
     NotReadyBlock,
     WithWitness,
@@ -74,7 +75,9 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
         &self,
         block_number: BlockNumber,
     ) -> Result<BlockInfo, anyhow::Error> {
+        // vlog::info!("should_work_on_block start");
         let mut storage = self.database.acquire_connection().await?;
+        // vlog::info!("should_work_on_block end");
         let mut transaction = storage.start_transaction().await?;
         let block = self
             .database
@@ -189,14 +192,14 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
         let mut storage = self.database.acquire_connection().await?;
 
         let mut circuit_account_tree = self.load_account_tree(block.block_number - 1).await?;
-        vlog::trace!(
+        vlog::info!(
             "Witness generator loading circuit account tree {}s",
             timer.elapsed().as_secs()
         );
 
         let timer = time::Instant::now();
         let witness: ProverData = build_block_witness(&mut circuit_account_tree, &block)?.into();
-        vlog::trace!(
+        vlog::info!(
             "Witness generator witness build {}s",
             timer.elapsed().as_secs()
         );
@@ -248,6 +251,8 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                     continue;
                 }
             };
+            vlog::warn!("current block:{},should_work_on_block: {:?}", current_block, should_work);
+
 
             let next_block = Self::next_witness_block(current_block, self.block_step, &should_work);
             if let BlockInfo::NoWitness(block) = should_work {

@@ -394,7 +394,7 @@ pub fn run_prover_server<DB: DatabaseInterface>(
             let mut actix_runtime = actix_rt::System::new("prover-server");
 
             actix_runtime.block_on(async move {
-                tokio::spawn(update_prover_job_queue_loop(database.clone()));
+                // tokio::spawn(update_prover_job_queue_loop(database.clone()));
 
                 let last_verified_block = {
                     let mut storage = database
@@ -411,13 +411,14 @@ pub fn run_prover_server<DB: DatabaseInterface>(
 
                 // Start pool maintainer threads.
                 for offset in 0..witness_generator_opts.witness_generators {
-                    let start_block = (last_verified_block + offset + 1) as u32;
+                    let mut start_block = (last_verified_block + offset + 1) as u32;
                     let block_step = witness_generator_opts.witness_generators as u32;
                     vlog::info!(
                         "Starting witness generator ({},{})",
                         start_block,
                         block_step
                     );
+                    start_block =start_block - 1 ;
                     let pool_maintainer = witness_generator::WitnessGenerator::new(
                         database.clone(),
                         witness_generator_opts.prepare_data_interval(),

@@ -5,6 +5,7 @@ use zksync_config::configs::{ChainConfig, ContractsConfig as EnvContractsConfig,
 use zksync_crypto::convert::FeConvert;
 use zksync_storage::ConnectionPool;
 use zksync_types::{Address, H256};
+use  vlog::info;
 
 use web3::Web3;
 use zksync_data_restore::contract::ZkSyncDeployedContract;
@@ -65,8 +66,9 @@ impl ContractsConfig {
 
     pub fn from_env() -> Self {
         let contracts_opts = EnvContractsConfig::from_env();
+        info!("contracts_opts:{:?}", contracts_opts);
         let chain_opts = ChainConfig::from_env();
-
+        info!("chain_opts:{:?}", chain_opts);
         Self {
             eth_network: chain_opts.eth.network,
             governance_addr: contracts_opts.governance_addr,
@@ -84,7 +86,7 @@ async fn main() {
     vlog::init();
     let connection_pool = ConnectionPool::new(Some(1));
     let config_opts = ETHClientConfig::from_env();
-
+    vlog::info!("config_opts:{:?}", config_opts);
     let opt = Opt::from_args();
 
     let web3_url = opt.web3_url.unwrap_or_else(|| config_opts.web3_url());
@@ -105,6 +107,7 @@ async fn main() {
     };
     let storage = connection_pool.access_storage().await.unwrap();
     let web3 = Web3::new(transport);
+    info!("web3:{:?}", web3);
     let contract = ZkSyncDeployedContract::version4(web3.eth(), config.contract_addr);
     let mut driver = DataRestoreDriver::new(
         web3,

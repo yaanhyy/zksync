@@ -10,7 +10,7 @@ use crate::contract::ZkSyncDeployedContract;
 use crate::eth_tx_helpers::get_block_number_from_ethereum_transaction;
 use crate::events::{BlockEvent, EventType};
 use zksync_types::{Address, BlockNumber, TokenId};
-
+use vlog::info;
 #[derive(Debug)]
 pub struct NewTokenEvent {
     pub address: Address,
@@ -93,6 +93,7 @@ impl EventsState {
         end_eth_blocks_offset: u64,
     ) -> Result<(Vec<BlockEvent>, Vec<NewTokenEvent>, u64), anyhow::Error> {
         self.remove_verified_events();
+
 
         let (events, token_events, to_block_number) =
             EventsState::get_new_events_and_last_watched_block(
@@ -364,13 +365,20 @@ impl EventsState {
     fn remove_verified_events(&mut self) {
         let count_to_remove = self.verified_events.len();
         self.verified_events.clear();
-        self.committed_events.drain(0..count_to_remove);
+        if (count_to_remove <= self.committed_events.len()) {
+            self.committed_events.drain(0..count_to_remove);
+        } else {
+            self.committed_events.clear();
+        }
     }
 
     /// Returns only verified committed blocks from verified
     pub fn get_only_verified_committed_events(&self) -> Vec<BlockEvent> {
         let count_to_get = self.verified_events.len();
-        self.committed_events[0..count_to_get].to_vec()
+        if (count_to_get <= self.committed_events.len()) {
+            return self.committed_events[0..count_to_get].to_vec()
+        }
+        self.committed_events.to_vec()
     }
 }
 
