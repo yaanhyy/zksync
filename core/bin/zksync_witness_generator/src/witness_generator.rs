@@ -156,6 +156,11 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                 .load_committed_state(&mut storage, Some(block))
                 .await?;
             for (id, account) in accounts {
+                vlog::info!(
+                    "load_committed_state id, account ({:?},{:?})",
+                    id,
+                    account
+                );
                 circuit_account_tree.insert(*id, account.into());
             }
             circuit_account_tree.root_hash();
