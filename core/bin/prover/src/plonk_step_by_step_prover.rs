@@ -20,11 +20,12 @@ struct PreparedComputations {
 }
 
 pub struct PlonkStepByStepProver {
-    config: PlonkStepByStepProverConfig,
+    pub config: PlonkStepByStepProverConfig,
     prepared_computations: Mutex<Option<PreparedComputations>>,
     precomputed_sample_proofs: PrecomputedSampleProofs,
 }
 
+#[derive(Debug)]
 pub struct PlonkStepByStepProverConfig {
     pub all_block_sizes: Vec<usize>,
     pub block_sizes: Vec<usize>,
@@ -170,6 +171,7 @@ impl ProverImpl for PlonkStepByStepProver {
 
     fn create_from_config(config: PlonkStepByStepProverConfig) -> Self {
         assert!(!config.block_sizes.is_empty());
+        vlog::info!("prover_config:{:?}", config);
         PlonkStepByStepProver {
             config,
             prepared_computations: Mutex::new(None),

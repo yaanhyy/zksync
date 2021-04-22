@@ -394,7 +394,7 @@ pub fn run_prover_server<DB: DatabaseInterface>(
             let mut actix_runtime = actix_rt::System::new("prover-server");
 
             actix_runtime.block_on(async move {
-                // tokio::spawn(update_prover_job_queue_loop(database.clone()));
+                tokio::spawn(update_prover_job_queue_loop(database.clone()));
 
                 let last_verified_block = {
                     let mut storage = database

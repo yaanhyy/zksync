@@ -33,14 +33,15 @@ where
 {
     let opt = Opt::from_args();
     let worker_name = opt.worker_name;
-
+    vlog::init();
     // used env
     let prover_options = EnvProverConfig::from_env();
+    vlog::info!("prover_options:{:?}", prover_options);
     let prover_config = <PROVER as ProverImpl>::Config::from_env();
     let api_client = api_client_from_env();
     let prover = PROVER::create_from_config(prover_config);
 
-    vlog::init();
+
 
     vlog::info!("creating prover, worker name: {}", worker_name);
 
