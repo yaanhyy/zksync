@@ -226,16 +226,22 @@ where
             tree_state.unprocessed_prior_ops, // unprocessed priority op
             tree_state.fee_acc_id,            // fee account
         );
+
+        let last_store_block = interactor.get_last_store_block().await;
         match state {
             StorageUpdateState::Events => {
                 // Update operations
-                let new_ops_blocks = self.update_operations_state(interactor).await;
+                let mut new_ops_blocks = self.update_operations_state(interactor).await;
+                //delete used ops when program exit unexpected
+                new_ops_blocks.retain(|x| x.block_num>last_store_block);
                 // Update tree
                 self.update_tree_state(interactor, new_ops_blocks).await;
             }
             StorageUpdateState::Operations => {
                 // Update operations
-                let new_ops_blocks = interactor.get_ops_blocks_from_storage().await;
+                let mut new_ops_blocks = interactor.get_ops_blocks_from_storage().await;
+                //delete used ops when program exit unexpected
+                new_ops_blocks.retain(|x| x.block_num>last_store_block);
                 // Update tree
                 self.update_tree_state(interactor, new_ops_blocks).await;
             }
