@@ -1,10 +1,13 @@
-use crate::{Address, TokenId};
+use crate::{tx::ChangePubKeyType, Address, TokenId};
 use chrono::{DateTime, Utc};
 use num::{rational::Ratio, BigUint};
 use serde::{Deserialize, Serialize};
 use std::{fmt, fs::read_to_string, path::PathBuf, str::FromStr};
-use zksync_utils::parse_env;
-use zksync_utils::UnsignedRatioSerializeAsDecimal;
+use thiserror::Error;
+use zksync_utils::{parse_env, UnsignedRatioSerializeAsDecimal};
+
+/// ID of the ETH token in zkSync network.
+pub use zksync_crypto::params::ETH_TOKEN_ID;
 
 // Order of the fields is important (from more specific types to less specific types)
 /// Set of values that can be interpreted as a token descriptor.
@@ -119,7 +122,9 @@ impl Token {
 
 // Hidden as it relies on the filesystem structure, which can be different for reverse dependencies.
 #[doc(hidden)]
-pub fn get_genesis_token_list(network: &str) -> Result<Vec<TokenGenesisListItem>, anyhow::Error> {
+pub fn get_genesis_token_list(
+    network: &str,
+) -> Result<Vec<TokenGenesisListItem>, GetGenesisTokenListError> {
     let mut file_path = parse_env::<PathBuf>("ZKSYNC_HOME");
     file_path.push("etc");
     file_path.push("tokens");
@@ -145,20 +150,13 @@ pub struct TokenMarketVolume {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
-pub enum ChangePubKeyFeeType {
-    Onchain,
-    ECDSA,
-    CREATE2,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
 #[serde(untagged)]
 pub enum ChangePubKeyFeeTypeArg {
     PreContracts4Version {
         #[serde(rename = "onchainPubkeyAuth")]
         onchain_pubkey_auth: bool,
     },
-    ContractsV4Version(ChangePubKeyFeeType),
+    ContractsV4Version(ChangePubKeyType),
 }
 
 /// Type of transaction fees that exist in the zkSync network.
@@ -172,6 +170,18 @@ pub enum TxFeeTypes {
     Transfer,
     /// Fee for the `ChangePubKey` operation.
     ChangePubKey(ChangePubKeyFeeTypeArg),
+}
+
+#[derive(Debug, Error, PartialEq)]
+#[error("Incorrect ProverJobStatus number: {0}")]
+pub struct IncorrectProverJobStatus(pub i32);
+
+#[derive(Debug, Error)]
+pub enum GetGenesisTokenListError {
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
+    #[error(transparent)]
+    SerdeError(#[from] serde_json::Error),
 }
 
 #[cfg(test)]
@@ -208,7 +218,7 @@ mod tests {
         assert_eq!(
             deserialized,
             TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                ChangePubKeyFeeType::Onchain
+                ChangePubKeyType::Onchain
             ))
         );
 
@@ -218,7 +228,7 @@ mod tests {
         assert_eq!(
             deserialized,
             TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                ChangePubKeyFeeType::ECDSA
+                ChangePubKeyType::ECDSA
             ))
         );
 
@@ -228,7 +238,7 @@ mod tests {
         assert_eq!(
             deserialized,
             TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                ChangePubKeyFeeType::CREATE2
+                ChangePubKeyType::CREATE2
             ))
         );
     }

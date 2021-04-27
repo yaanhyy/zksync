@@ -2,8 +2,8 @@
 // Workspace imports
 use zksync_crypto::{convert::FeConvert, rand::XorShiftRng};
 use zksync_types::{
-    aggregated_operations::AggregatedActionType, helpers::apply_updates, AccountId, AccountMap,
-    AccountUpdate, AccountUpdates, BlockNumber, TokenId, H256,
+    aggregated_operations::AggregatedActionType, helpers::apply_updates, tx::ChangePubKeyType,
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, TokenId, H256,
 };
 // Local imports
 use crate::{
@@ -164,10 +164,10 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
                 .find_block_by_height_or_hash(query.clone())
                 .await
                 .unwrap_or_else(|| {
-                    panic!(format!(
+                    panic!(
                         "Can't load the existing block with the index {} using query {}",
                         expected_block_detail.block_number, query
-                    ))
+                    )
                 });
             assert_eq!(
                 actual_block_detail.block_number,
@@ -352,10 +352,10 @@ async fn test_block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
                 .find_block_by_height_or_hash(block_number.to_string())
                 .await
                 .unwrap_or_else(|| {
-                    panic!(format!(
+                    panic!(
                         "Can't load the existing block with the index {}",
                         block_number
-                    ))
+                    )
                 });
             let got = &block_range[idx];
             assert_eq!(got, &expected);
@@ -613,7 +613,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         operations::{ChangePubKeyOp, TransferToNewOp},
         ExecutedOperations, ExecutedTx, ZkSyncOp, ZkSyncTx,
     };
-    vlog::init();
+    let _sentry_guard = vlog::init();
 
     let from_account_id = AccountId(0xbabe);
     let from_zksync_account = ZkSyncAccount::rand();
@@ -629,7 +629,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
             false,
             TokenId(0),
             Default::default(),
-            false,
+            ChangePubKeyType::ECDSA,
             Default::default(),
         );
 
@@ -926,6 +926,104 @@ async fn test_operations_counter(mut storage: StorageProcessor<'_>) -> QueryResu
             .await?,
         2
     );
+
+    Ok(())
+}
+
+/// Check that blocks are removed correctly.
+#[db_test]
+async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    // Insert 5 blocks.
+    for block_number in 1..=5 {
+        BlockSchema(&mut storage)
+            .save_block(gen_sample_block(
+                BlockNumber(block_number),
+                BLOCK_SIZE_CHUNKS,
+                Default::default(),
+            ))
+            .await?;
+        OperationsSchema(&mut storage)
+            .store_aggregated_action(gen_unique_aggregated_operation(
+                BlockNumber(block_number),
+                AggregatedActionType::CommitBlocks,
+                BLOCK_SIZE_CHUNKS,
+            ))
+            .await?;
+    }
+    // Remove blocks with numbers greater than 2.
+    BlockSchema(&mut storage)
+        .remove_blocks(BlockNumber(2))
+        .await?;
+
+    // Check if the 2nd block is present, and the 3rd is not.
+    assert!(BlockSchema(&mut storage)
+        .get_block(BlockNumber(2))
+        .await?
+        .is_some());
+    assert!(BlockSchema(&mut storage)
+        .get_block(BlockNumber(3))
+        .await?
+        .is_none());
+
+    Ok(())
+}
+
+/// Check that blocks are removed correctly.
+#[db_test]
+async fn test_remove_pending_block(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    use zksync_types::block::PendingBlock;
+
+    let pending_block_1 = PendingBlock {
+        number: BlockNumber(3),
+        chunks_left: 10,
+        unprocessed_priority_op_before: 0,
+        pending_block_iteration: 1,
+        success_operations: Vec::new(),
+        failed_txs: Vec::new(),
+        previous_block_root_hash: H256::default(),
+        timestamp: 0,
+    };
+
+    BlockSchema(&mut storage)
+        .save_pending_block(pending_block_1.clone())
+        .await?;
+    BlockSchema(&mut storage).remove_pending_block().await?;
+    assert!(!BlockSchema(&mut storage).pending_block_exists().await?);
+
+    Ok(())
+}
+
+/// Check that account tree cache is removed correctly.
+#[db_test]
+async fn test_remove_account_tree_cache(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    // Insert account tree cache for 5 blocks.
+    for block_number in 1..=5 {
+        BlockSchema(&mut storage)
+            .save_block(gen_sample_block(
+                BlockNumber(block_number),
+                BLOCK_SIZE_CHUNKS,
+                Default::default(),
+            ))
+            .await?;
+        BlockSchema(&mut storage)
+            .store_account_tree_cache(BlockNumber(block_number), serde_json::Value::default())
+            .await?;
+    }
+
+    // Remove account tree cache for blocks with numbers greater than 2.
+    BlockSchema(&mut storage)
+        .remove_account_tree_cache(BlockNumber(2))
+        .await?;
+
+    // Check if account tree cache for the 2nd block is present, and for the 3rd is not.
+    assert!(BlockSchema(&mut storage)
+        .get_account_tree_cache_block(BlockNumber(2))
+        .await?
+        .is_some());
+    assert!(BlockSchema(&mut storage)
+        .get_account_tree_cache_block(BlockNumber(3))
+        .await?
+        .is_none());
 
     Ok(())
 }

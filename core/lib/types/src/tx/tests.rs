@@ -1,11 +1,13 @@
 use zksync_basic_types::Address;
-use zksync_crypto::franklin_crypto::{
-    eddsa::{PrivateKey, PublicKey},
-    jubjub::FixedGenerators,
+use zksync_crypto::{
+    franklin_crypto::{
+        eddsa::{PrivateKey, PublicKey},
+        jubjub::FixedGenerators,
+    },
+    params::{max_account_id, max_token_id, JUBJUB_PARAMS},
+    public_key_from_private,
+    rand::{Rng, SeedableRng, XorShiftRng},
 };
-use zksync_crypto::params::{max_account_id, max_token_id, JUBJUB_PARAMS};
-use zksync_crypto::public_key_from_private;
-use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 
 use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
@@ -21,9 +23,7 @@ fn gen_pk_and_msg() -> (PrivateKey<Engine>, Vec<Vec<u8>>) {
 
     let pk = PrivateKey(rng.gen());
 
-    let mut messages = Vec::new();
-    messages.push(Vec::<u8>::new());
-    messages.push(b"hello world".to_vec());
+    let messages = vec![Vec::<u8>::new(), b"hello world".to_vec()];
 
     (pk, messages)
 }

@@ -4,7 +4,6 @@ use crate::{
 };
 
 use crate::account::PubKeyHash;
-use anyhow::ensure;
 use num::{BigUint, Zero};
 use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
@@ -16,7 +15,17 @@ use zksync_crypto::{
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{PackedEthSignature, TimeRange, TxSignature, VerifiedSignatureCache};
-use crate::tokens::{ChangePubKeyFeeType, ChangePubKeyFeeTypeArg};
+use crate::{
+    tokens::ChangePubKeyFeeTypeArg,
+    tx::error::{ChangePubkeySignedDataError, TransactionSignatureError},
+};
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
+pub enum ChangePubKeyType {
+    Onchain,
+    ECDSA,
+    CREATE2,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,8 +52,7 @@ impl ChangePubKeyCREATE2Data {
             bytes.keccak256()
         };
 
-        let mut bytes = Vec::new();
-        bytes.push(0xff);
+        let mut bytes = vec![0xff];
         bytes.extend_from_slice(self.creator_address.as_bytes());
         bytes.extend_from_slice(&salt);
         bytes.extend_from_slice(self.code_hash.as_bytes());
@@ -77,8 +85,7 @@ impl ChangePubKeyEthAuthData {
         match self {
             ChangePubKeyEthAuthData::Onchain => Vec::new(),
             ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData { eth_signature, .. }) => {
-                let mut bytes = Vec::new();
-                bytes.push(0x00);
+                let mut bytes = vec![0x00];
                 bytes.extend_from_slice(&eth_signature.serialize_packed());
                 // bytes.extend_from_slice(batch_hash.as_bytes());
                 bytes
@@ -88,8 +95,7 @@ impl ChangePubKeyEthAuthData {
                 salt_arg,
                 code_hash,
             }) => {
-                let mut bytes = Vec::new();
-                bytes.push(0x01);
+                let mut bytes = vec![0x01];
                 bytes.extend_from_slice(creator_address.as_bytes());
                 bytes.extend_from_slice(salt_arg.as_bytes());
                 bytes.extend_from_slice(code_hash.as_bytes());
@@ -98,11 +104,11 @@ impl ChangePubKeyEthAuthData {
         }
     }
 
-    pub fn get_fee_type(&self) -> ChangePubKeyFeeType {
+    pub fn get_fee_type(&self) -> ChangePubKeyType {
         match self {
-            ChangePubKeyEthAuthData::Onchain => ChangePubKeyFeeType::Onchain,
-            ChangePubKeyEthAuthData::ECDSA(_) => ChangePubKeyFeeType::ECDSA,
-            ChangePubKeyEthAuthData::CREATE2(_) => ChangePubKeyFeeType::CREATE2,
+            ChangePubKeyEthAuthData::Onchain => ChangePubKeyType::Onchain,
+            ChangePubKeyEthAuthData::ECDSA(_) => ChangePubKeyType::ECDSA,
+            ChangePubKeyEthAuthData::CREATE2(_) => ChangePubKeyType::CREATE2,
         }
     }
 }
@@ -199,7 +205,7 @@ impl ChangePubKey {
     }
 
     /// Creates a signed transaction using private key and
-    /// checks for the transaction correcteness.
+    /// checks the transaction correctness.
     #[allow(clippy::too_many_arguments)]
     pub fn new_signed(
         account_id: AccountId,
@@ -211,7 +217,7 @@ impl ChangePubKey {
         time_range: TimeRange,
         eth_signature: Option<PackedEthSignature>,
         private_key: &PrivateKey,
-    ) -> Result<Self, anyhow::Error> {
+    ) -> Result<Self, TransactionSignatureError> {
         let mut tx = Self::new(
             account_id,
             account,
@@ -225,7 +231,7 @@ impl ChangePubKey {
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
-            anyhow::bail!(crate::tx::TRANSACTION_SIGNATURE_ERROR);
+            return Err(TransactionSignatureError);
         }
         Ok(tx)
     }
@@ -258,7 +264,7 @@ impl ChangePubKey {
     }
 
     /// Provides a message to be signed with the Ethereum private key.
-    pub fn get_eth_signed_data(&self) -> Result<Vec<u8>, anyhow::Error> {
+    pub fn get_eth_signed_data(&self) -> Result<Vec<u8>, ChangePubkeySignedDataError> {
         // Fee data is not included into ETH signature input, since it would require
         // to either have more chunks in pubdata (if fee amount is unpacked), unpack
         // fee on contract (if fee amount is packed), or display non human-readable
@@ -280,17 +286,17 @@ impl ChangePubKey {
         } else {
             eth_signed_msg.extend_from_slice(H256::default().as_bytes());
         }
-        ensure!(
-            eth_signed_msg.len() == CHANGE_PUBKEY_SIGNATURE_LEN,
-            "Change pubkey signed message does not match in size: {}, expected: {}",
-            eth_signed_msg.len(),
-            CHANGE_PUBKEY_SIGNATURE_LEN
-        );
+        if eth_signed_msg.len() != CHANGE_PUBKEY_SIGNATURE_LEN {
+            return Err(ChangePubkeySignedDataError::SignedMessageLengthMismatch {
+                actual: eth_signed_msg.len(),
+                expected: CHANGE_PUBKEY_SIGNATURE_LEN,
+            });
+        }
         Ok(eth_signed_msg)
     }
 
     /// Provides an old message to be signed with the Ethereum private key.
-    pub fn get_old_eth_signed_data(&self) -> Result<Vec<u8>, anyhow::Error> {
+    pub fn get_old_eth_signed_data(&self) -> Result<Vec<u8>, ChangePubkeySignedDataError> {
         // Fee data is not included into ETH signature input, since it would require
         // to either have more chunks in pubdata (if fee amount is unpacked), unpack
         // fee on contract (if fee amount is packed), or display non human-readable
@@ -315,12 +321,13 @@ impl ChangePubKey {
             .as_bytes(),
         );
         eth_signed_msg.extend_from_slice(b"Only sign this message for a trusted client!");
-        ensure!(
-            eth_signed_msg.len() == CHANGE_PUBKEY_SIGNATURE_LEN,
-            "Change pubkey signed message len is too big: {}, expected: {}",
-            eth_signed_msg.len(),
-            CHANGE_PUBKEY_SIGNATURE_LEN
-        );
+
+        if eth_signed_msg.len() != CHANGE_PUBKEY_SIGNATURE_LEN {
+            return Err(ChangePubkeySignedDataError::SignedMessageLengthMismatch {
+                actual: eth_signed_msg.len(),
+                expected: CHANGE_PUBKEY_SIGNATURE_LEN,
+            });
+        }
         Ok(eth_signed_msg)
     }
 
@@ -411,15 +418,17 @@ impl ChangePubKey {
         message
     }
 
-    pub fn get_fee_type(&self) -> TxFeeTypes {
+    pub fn get_change_pubkey_fee_type(&self) -> ChangePubKeyFeeTypeArg {
         if let Some(auth_data) = &self.eth_auth_data {
-            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                auth_data.get_fee_type(),
-            ))
+            ChangePubKeyFeeTypeArg::ContractsV4Version(auth_data.get_fee_type())
         } else {
-            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
+            ChangePubKeyFeeTypeArg::PreContracts4Version {
                 onchain_pubkey_auth: self.eth_auth_data.is_none(),
-            })
+            }
         }
+    }
+
+    pub fn get_fee_type(&self) -> TxFeeTypes {
+        TxFeeTypes::ChangePubKey(self.get_change_pubkey_fee_type())
     }
 }

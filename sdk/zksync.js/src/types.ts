@@ -12,6 +12,8 @@ export type TokenSymbol = string;
 // Token address (e.g. 0xde..ad for ERC20, or 0x00.00 for "ETH")
 export type TokenAddress = string;
 
+export type TotalFee = Map<TokenLike, BigNumber>;
+
 export type Nonce = number | 'committed';
 
 export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet' | 'rinkeby-beta' | 'ropsten-beta';
@@ -112,7 +114,7 @@ export interface ForcedExit {
     validUntil: number;
 }
 
-export type ChangePubkeyTypes = 'Onchain' | 'ECDSA' | 'CREATE2';
+export type ChangePubkeyTypes = 'Onchain' | 'ECDSA' | 'CREATE2' | 'ECDSALegacyMessage';
 
 export interface ChangePubKeyOnchain {
     type: 'Onchain';
@@ -140,7 +142,8 @@ export interface ChangePubKey {
     fee: BigNumberish;
     nonce: number;
     signature?: Signature;
-    ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+    ethAuthData?: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+    ethSignature?: string;
     validFrom: number;
     validUntil: number;
 }
@@ -201,6 +204,12 @@ export interface ChangePubKeyFee {
     // 'ECDSA' if it's done by providing an Ethereum signature in zkSync transaction.
     // 'CREATE2' if it's done by providing arguments to restore account ethereum address according to CREATE2 specification.
     "ChangePubKey": ChangePubkeyTypes;
+}
+
+export interface LegacyChangePubKeyFee {
+    ChangePubKey: {
+        onchainPubkeyAuth: boolean;
+    };
 }
 
 export interface Fee {

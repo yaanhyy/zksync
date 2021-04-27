@@ -259,21 +259,18 @@ impl TestSetup {
         token: Token,
         amount: BigUint,
     ) -> (Vec<TransactionReceipt>, PriorityOp, Vec<AccountTransfer>) {
-        let mut transfers = vec![];
-
-        transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
-            account_id: from,
-            token_id: token.0,
-            amount: BigInt::from_biguint(Sign::Minus, amount.clone()),
-        }));
-
-        transfers.push(AccountTransfer::ZkSyncAccountTransfer(
-            ZkSyncAccountTransfer {
+        let mut transfers = vec![
+            AccountTransfer::EthAccountTransfer(EthAccountTransfer {
+                account_id: from,
+                token_id: token.0,
+                amount: BigInt::from_biguint(Sign::Minus, amount.clone()),
+            }),
+            AccountTransfer::ZkSyncAccountTransfer(ZkSyncAccountTransfer {
                 account_id: to,
                 token_id: token.0,
                 amount: BigInt::from_biguint(Sign::Plus, amount.clone()),
-            },
-        ));
+            }),
+        ];
 
         let token_address = if token.0 == TokenId(0) {
             None
@@ -292,7 +289,7 @@ impl TestSetup {
 
         for r in &receipts {
             let current_fee =
-                get_executed_tx_fee(self.commit_account.main_contract_eth_client.web3.eth(), &r)
+                get_executed_tx_fee(&self.commit_account.main_contract_eth_client, &r)
                     .await
                     .expect("Failed to get transaction fee");
 
@@ -349,13 +346,11 @@ impl TestSetup {
         amount: BigUint,
         rng: &mut impl Rng,
     ) -> (Vec<TransactionReceipt>, Vec<AccountTransfer>) {
-        let mut transfers = vec![];
-
-        transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
+        let mut transfers = vec![AccountTransfer::EthAccountTransfer(EthAccountTransfer {
             account_id: from,
             token_id: token.0,
             amount: BigInt::from_biguint(Sign::Minus, amount.clone()),
-        }));
+        })];
 
         let token_address = if token.0 == TokenId(0) {
             None
@@ -377,7 +372,7 @@ impl TestSetup {
 
         for r in &receipts {
             let current_fee =
-                get_executed_tx_fee(self.commit_account.main_contract_eth_client.web3.eth(), &r)
+                get_executed_tx_fee(&self.commit_account.main_contract_eth_client, &r)
                     .await
                     .expect("Failed to get transaction fee");
 
@@ -480,12 +475,9 @@ impl TestSetup {
             .full_exit(post_by, token_address, account_id)
             .await;
 
-        let gas_fee = get_executed_tx_fee(
-            self.commit_account.main_contract_eth_client.web3.eth(),
-            &receipt,
-        )
-        .await
-        .expect("Failed to get transaction fee");
+        let gas_fee = get_executed_tx_fee(&self.commit_account.main_contract_eth_client, &receipt)
+            .await
+            .expect("Failed to get transaction fee");
 
         transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
             account_id: post_by,

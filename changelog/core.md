@@ -8,9 +8,31 @@ All notable changes to the core components will be documented in this file.
 
 ### Changed
 
+- (`loadtest`): `zksync_fee` has been moved to `[main_wallet]` section from the `[network]` section.
+- A special balancer for FeeTicker was replaced with a generic balancer.
+- (`eth_client`): `web3` field was made private in `ETHDirectClient`. `testkit` and `loadtest` don't use it directly
+  now.
+- (`api_server`): Make `submit_txs_batch` send only one signature request.
+- Fast withdrawals now can trigger aggregated block execution.
+- Replaced `anyhow` errors with typed errors in `lib/state`, `lib/crypto` and `lib/types`.
+
 ### Added
 
+- (`loadtest`): Added `zksync_fee` option into the `[scenario]` section to set fee for each scenario individually, added
+  `fee_token` option into the `[main_wallet]` section to set token that is used to pay fees for the main wallet
+  operations.
+- (`eth_client`): Added `get_tx`, `create_contract` methods to `EthereumGateway`, `get_web3_transport` method to
+  ETHDirectClient.
+- (`api_server`): Support for accounts that don't have to pay fees (e.g. network service accounts) was added.
+- Added `BlockMetadata` structure and corresponding table to track block data that is not related to protocol.
+- (`block_revert`): CLI that calls `revertBlocks` smart contract function and updates the database respectively.
+
 ### Fixed
+
+- (`zksync_api`): Internal error with tokens not listed on CoinGecko.
+- Fix wrong block info cache behavior in the `api_server`.
+- Bug with gas price limit being used instead of average gas price when storing data to DB in gas adjuster.
+- `timeout` in ETH sender main loop was replaced with `tokio::time::delay_for`.
 
 ## Release 2021-02-19
 
@@ -25,9 +47,13 @@ All notable changes to the core components will be documented in this file.
 
 - Added a stressing dev fee ticker scenario to the loadtest.
 - Added a `--sloppy` mode to the `dev-fee-ticker-server` to simulate bad networks with the random delays and fails.
+- Added `forced_exit_requests` functionality, which allows users to pay for ForcedExits from L1. Note that a few env
+  variables were added that control the behaviour of the tool.
 - Possibility to use CREATE2 ChangePubKey and Transfer in a single batch.
 
 ### Fixed
+
+- Bug with the assignment of new account ids in the state.
 
 ## Release 2021-02-02
 

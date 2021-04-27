@@ -13,7 +13,6 @@
 //!
 //! Communication with db:
 //! on restart mempool restores nonces of the accounts that are stored in the account tree.
-//! on accepting ChangePubKey tx saves account type - Owned or CREATE2
 
 // Built-in deps
 use std::{collections::HashMap, sync::Arc};
@@ -32,22 +31,19 @@ use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
 // Workspace uses
+use zksync_balancer::{Balancer, BuildBalancedItem};
 use zksync_config::ZkSyncConfig;
-use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool, StorageProcessor};
+use zksync_storage::ConnectionPool;
 use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
-    tx::{ChangePubKey, TxEthSignature},
+    tx::TxEthSignature,
     AccountId, AccountUpdate, AccountUpdates, Address, Nonce, PriorityOp, SignedZkSyncTx,
     TransferOp, TransferToNewOp, ZkSyncTx,
 };
 
 // Local uses
 use crate::mempool::mempool_transactions_queue::MempoolTransactionsQueue;
-use crate::{
-    balancer::{Balancer, BuildBalancedItem},
-    eth_watch::EthWatchRequest,
-    wait_for_tasks,
-};
+use crate::{eth_watch::EthWatchRequest, wait_for_tasks};
 
 mod mempool_transactions_queue;
 
@@ -237,31 +233,15 @@ impl MempoolState {
         *self.account_nonces.get(address).unwrap_or(&Nonce(0))
     }
 
-    fn add_tx(&mut self, tx: SignedZkSyncTx) -> Result<(), TxAddError> {
-        // Correctness should be checked by `signature_checker`, thus
-        // `tx.check_correctness()` is not invoked here.
-
-        if tx.nonce() >= self.nonce(&tx.account()) {
-            self.transactions_queue.add_tx_variant(tx.into());
-            Ok(())
-        } else {
-            Err(TxAddError::NonceMismatch)
-        }
+    fn add_tx(&mut self, tx: SignedZkSyncTx) {
+        self.transactions_queue.add_tx_variant(tx.into());
     }
 
-    fn add_batch(&mut self, batch: SignedTxsBatch) -> Result<(), TxAddError> {
+    fn add_batch(&mut self, batch: SignedTxsBatch) {
         assert_ne!(batch.batch_id, 0, "Batch ID was not set");
-
-        for tx in batch.txs.iter() {
-            if tx.nonce() < self.nonce(&tx.account()) {
-                return Err(TxAddError::NonceMismatch);
-            }
-        }
 
         self.transactions_queue
             .add_tx_variant(SignedTxVariant::Batch(batch));
-
-        Ok(())
     }
 }
 
@@ -459,34 +439,20 @@ impl BuildBalancedItem<MempoolTransactionRequest, MempoolTransactionsHandler>
     }
 }
 
-async fn store_account_type(
-    tx: &ChangePubKey,
-    storage: &mut StorageProcessor<'_>,
-) -> Result<(), TxAddError> {
-    let account_type = match &tx.eth_auth_data {
-        Some(auth) if auth.is_create2() => EthAccountType::CREATE2,
-        _ => EthAccountType::Owned,
-    };
-    storage
-        .chain()
-        .account_schema()
-        .set_account_type(tx.account_id, account_type)
-        .await
-        .map_err(|_| TxAddError::DbError)
-}
-
 impl MempoolTransactionsHandler {
     async fn add_tx(&mut self, tx: SignedZkSyncTx) -> Result<(), TxAddError> {
+        // Correctness should be checked by `signature_checker`, thus
+        // `tx.check_correctness()` is not invoked here.
+        if tx.nonce() < self.mempool_state.read().await.nonce(&tx.account()) {
+            return Err(TxAddError::NonceMismatch);
+        }
+
         let mut storage = self.db_pool.access_storage().await.map_err(|err| {
             vlog::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
 
-        let mut transaction = storage.start_transaction().await.map_err(|err| {
-            vlog::warn!("Mempool storage access error: {}", err);
-            TxAddError::DbError
-        })?;
-        transaction
+        storage
             .chain()
             .mempool_schema()
             .insert_tx(&tx)
@@ -496,18 +462,8 @@ impl MempoolTransactionsHandler {
                 TxAddError::DbError
             })?;
 
-        // FIXME: we are saving account type in mempool, this presents
-        // a possibility for users to spam our database using lots of invalid txs (ZKS-429)
-        if let ZkSyncTx::ChangePubKey(tx) = &tx.tx {
-            store_account_type(&tx, &mut transaction).await?;
-        }
-
-        transaction.commit().await.map_err(|err| {
-            vlog::warn!("Mempool storage access error: {}", err);
-            TxAddError::DbError
-        })?;
-
-        self.mempool_state.write().await.add_tx(tx)
+        self.mempool_state.write().await.add_tx(tx);
+        Ok(())
     }
 
     async fn add_batch(
@@ -515,10 +471,13 @@ impl MempoolTransactionsHandler {
         txs: Vec<SignedZkSyncTx>,
         eth_signatures: Vec<TxEthSignature>,
     ) -> Result<(), TxAddError> {
-        let mut storage = self.db_pool.access_storage().await.map_err(|err| {
-            vlog::warn!("Mempool storage access error: {}", err);
-            TxAddError::DbError
-        })?;
+        for tx in txs.iter() {
+            // Correctness should be checked by `signature_checker`, thus
+            // `tx.check_correctness()` is not invoked here.
+            if tx.nonce() < self.mempool_state.read().await.nonce(&tx.account()) {
+                return Err(TxAddError::NonceMismatch);
+            }
+        }
 
         let mut batch: SignedTxsBatch = SignedTxsBatch {
             txs: txs.clone(),
@@ -530,16 +489,12 @@ impl MempoolTransactionsHandler {
             return Err(TxAddError::BatchTooBig);
         }
 
-        let mut transaction = storage.start_transaction().await.map_err(|err| {
+        let mut storage = self.db_pool.access_storage().await.map_err(|err| {
             vlog::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
-        for tx in txs {
-            if let ZkSyncTx::ChangePubKey(tx) = &tx.tx {
-                store_account_type(&tx, &mut transaction).await?;
-            }
-        }
-        let batch_id = transaction
+
+        let batch_id = storage
             .chain()
             .mempool_schema()
             .insert_batch(&batch.txs, eth_signatures)
@@ -548,14 +503,11 @@ impl MempoolTransactionsHandler {
                 vlog::warn!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
-        transaction.commit().await.map_err(|err| {
-            vlog::warn!("Mempool storage access error: {}", err);
-            TxAddError::DbError
-        })?;
 
         batch.batch_id = batch_id;
 
-        self.mempool_state.write().await.add_batch(batch)
+        self.mempool_state.write().await.add_batch(batch);
+        Ok(())
     }
 
     async fn run(mut self) {

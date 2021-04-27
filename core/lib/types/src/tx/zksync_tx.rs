@@ -6,7 +6,10 @@ use zksync_basic_types::{AccountId, Address};
 
 use crate::{
     operations::ChangePubKeyOp,
-    tx::{ChangePubKey, Close, ForcedExit, Transfer, TxEthSignature, TxHash, Withdraw},
+    tx::{
+        error::CloseOperationsDisabled, ChangePubKey, Close, ForcedExit, Transfer, TxEthSignature,
+        TxHash, Withdraw,
+    },
     utils::deserialize_eth_message,
     CloseOp, ForcedExitOp, Nonce, Token, TokenId, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
 };
@@ -117,13 +120,13 @@ impl ZkSyncTx {
         }
     }
 
-    pub fn account_id(&self) -> anyhow::Result<AccountId> {
+    pub fn account_id(&self) -> Result<AccountId, CloseOperationsDisabled> {
         match self {
             ZkSyncTx::Transfer(tx) => Ok(tx.account_id),
             ZkSyncTx::Withdraw(tx) => Ok(tx.account_id),
             ZkSyncTx::ChangePubKey(tx) => Ok(tx.account_id),
             ZkSyncTx::ForcedExit(tx) => Ok(tx.initiator_account_id),
-            ZkSyncTx::Close(_) => Err(anyhow::anyhow!("Close operations are disabled")),
+            ZkSyncTx::Close(_) => Err(CloseOperationsDisabled()),
         }
     }
 
@@ -250,7 +253,7 @@ impl ZkSyncTx {
         matches!(self, ZkSyncTx::Withdraw(_) | ZkSyncTx::ForcedExit(_))
     }
 
-    /// Returns `true` if transaction is `ZkSyncTx::Withdraw`.
+    /// Returns `true` if transaction is `ZkSyncTx::Close`.
     #[doc(hidden)]
     pub fn is_close(&self) -> bool {
         matches!(self, ZkSyncTx::Close(_))

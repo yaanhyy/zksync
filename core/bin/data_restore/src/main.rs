@@ -53,7 +53,6 @@ pub struct ContractsConfig {
     governance_addr: Address,
     genesis_tx_hash: H256,
     contract_addr: Address,
-    upgrade_gatekeeper_addr: Address,
     available_block_chunk_sizes: Vec<usize>,
 }
 
@@ -74,7 +73,6 @@ impl ContractsConfig {
             governance_addr: contracts_opts.governance_addr,
             genesis_tx_hash: contracts_opts.genesis_tx_hash,
             contract_addr: contracts_opts.contract_addr,
-            upgrade_gatekeeper_addr: contracts_opts.upgrade_gatekeeper_addr,
             available_block_chunk_sizes: chain_opts.state_keeper.block_chunk_sizes,
         }
     }
@@ -83,7 +81,7 @@ impl ContractsConfig {
 #[tokio::main]
 async fn main() {
     vlog::info!("Restoring zkSync state from the contract");
-    vlog::init();
+    let _sentry_guard = vlog::init();
     let connection_pool = ConnectionPool::new(Some(1));
     let config_opts = ETHClientConfig::from_env();
     vlog::info!("config_opts:{:?}", config_opts);
@@ -97,6 +95,8 @@ async fn main() {
         .config_path
         .map(|path| ContractsConfig::from_file(&path))
         .unwrap_or_else(ContractsConfig::from_env);
+
+    vlog::info!("Using the following config: {:#?}", config);
 
     let finite_mode = opt.finite;
     let final_hash = if finite_mode {
@@ -117,6 +117,7 @@ async fn main() {
         finite_mode,
         final_hash,
         contract,
+        config.available_block_chunk_sizes,
     );
 
     let mut interactor = DatabaseStorageInteractor::new(storage);

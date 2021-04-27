@@ -15,6 +15,8 @@ components, the logs will have the following format:
 
 ### Added
 
+- `loadnext` crate, a new implementation of the loadtest for zkSync.
+
 ### Fixed
 
 ## Release 2021-02-19
@@ -31,6 +33,7 @@ components, the logs will have the following format:
 
 - (`read-variable`): tool for read private and public variables from contracts.
 - (`reading-tool`): tool for reading test config.
+- (`explorer`): column "Can be used to pay fees" for tokens.
 
 ### Fixed
 

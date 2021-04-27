@@ -6,9 +6,35 @@ All notable changes to `zksync.js` will be documented in this file.
 
 ### Added
 
-- Method for calculation of transaction hash.
+### Changed
+
+### Deprecated
+
+### Fixed
+
+## Version 0.10.9 (13.04.2021)
 
 ### Changed
+
+- Exported classes: `ETHOperation`, `Transaction`, `ZKSyncTxError`
+- Exported types: `TotalFee`
+
+## Version 0.10.6 (16.03.2021)
+
+### Added
+
+- (`BatchBuilder`) Make it possible to add signed `ChangePubKey` transaction to the batch.
+
+## Version 0.10.4 (08.03.2021)
+
+### Added
+
+- Method for calculation of transaction hash.
+- Support for environments without WebAssembly.
+
+### Changed
+
+- Hardcode gas limit for `depositERC20` for each token.
 
 ### Deprecated
 

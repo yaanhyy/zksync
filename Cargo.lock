@@ -465,9 +465,9 @@ dependencies = [
 
 [[package]]
 name = "async-executor"
-version = "1.3.0"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d373d78ded7d0b3fa8039375718cde0aace493f2e34fb60f51cbf567562ca801"
+checksum = "eb877970c7b440ead138f6321a3b5395d6061183af779340b65e20c0fede9146"
 dependencies = [
  "async-task",
  "concurrent-queue",
@@ -479,12 +479,15 @@ dependencies = [
 
 [[package]]
 name = "async-global-executor"
-version = "1.4.2"
+version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "124ac8c265e407641c3362b8f4d39cdb4e243885b71eef087be27199790f5a3a"
+checksum = "9586ec52317f36de58453159d48351bc244bc24ced3effc1fce22f3d48664af6"
 dependencies = [
+ "async-channel",
  "async-executor",
  "async-io",
+ "async-mutex",
+ "blocking",
  "futures-lite",
  "num_cpus",
  "once_cell",
@@ -492,9 +495,9 @@ dependencies = [
 
 [[package]]
 name = "async-io"
-version = "1.1.10"
+version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d54bc4c1c7292475efb2253227dbcfad8fe1ca4c02bc62c510cc2f3da5c4704e"
+checksum = "9315f8f07556761c3e48fec2e6b276004acf426e6dc068b2c2251854d65ee0fd"
 dependencies = [
  "concurrent-queue",
  "fastrand",
@@ -508,6 +511,15 @@ dependencies = [
  "vec-arena",
  "waker-fn",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "async-lock"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1996609732bde4a9988bc42125f55f2af5f3c36370e27c778d5191a4a1b63bfb"
+dependencies = [
+ "event-listener",
 ]
 
 [[package]]
@@ -533,15 +545,15 @@ dependencies = [
 
 [[package]]
 name = "async-std"
-version = "1.6.5"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9fa76751505e8df1c7a77762f60486f60c71bbd9b8557f4da6ad47d083732ed"
+checksum = "d9f06685bad74e0570f5213741bea82158279a4103d988e57bfada11ad230341"
 dependencies = [
+ "async-channel",
  "async-global-executor",
  "async-io",
- "async-mutex",
- "blocking",
- "crossbeam-utils 0.7.2",
+ "async-lock",
+ "crossbeam-utils 0.8.1",
  "futures-channel",
  "futures-core",
  "futures-io",
@@ -552,7 +564,7 @@ dependencies = [
  "memchr",
  "num_cpus",
  "once_cell",
- "pin-project-lite 0.1.11",
+ "pin-project-lite 0.2.4",
  "pin-utils",
  "slab",
  "wasm-bindgen-futures",
@@ -764,6 +776,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
+name = "bitmaps"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "031043d04099746d8db04daf1fa424b2bc8bd69d92b25962dcde24da39ab64a2"
+dependencies = [
+ "typenum",
+]
+
+[[package]]
 name = "bitvec"
 version = "0.17.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -875,6 +896,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa79dedbb091f449f1f39e53edf88d5dbe95f895dae6135a8d7b881fb5af73f5"
 dependencies = [
  "byte-tools",
+]
+
+[[package]]
+name = "block_revert"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "ethabi",
+ "structopt",
+ "tokio 0.2.22",
+ "web3",
+ "zksync_config",
+ "zksync_eth_client",
+ "zksync_storage",
+ "zksync_types",
 ]
 
 [[package]]
@@ -1444,6 +1480,16 @@ dependencies = [
  "num_cpus",
  "serde",
  "tokio 0.2.22",
+]
+
+[[package]]
+name = "debugid"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f91cf5a8c2f2097e2a32627123508635d47ce10563d999ec1a95addf08b502ba"
+dependencies = [
+ "serde",
+ "uuid",
 ]
 
 [[package]]
@@ -2290,6 +2336,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "im"
+version = "15.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "111c1983f3c5bb72732df25cddacee9b546d08325fb584b5ebd38148be7b0246"
+dependencies = [
+ "bitmaps",
+ "rand_core 0.5.1",
+ "rand_xoshiro",
+ "sized-chunks",
+ "typenum",
+ "version_check 0.9.2",
+]
+
+[[package]]
 name = "impl-codec"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2601,9 +2661,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.79"
+version = "0.2.87"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2448f6066e80e3bfc792e9c98bf705b4b0fc6e8ef5b43e5889aff0eaa9c58743"
+checksum = "265d751d31d6780a3f956bb5b8022feba2d94eeee5a84ba64f4212eedca42213"
 
 [[package]]
 name = "libm"
@@ -2616,6 +2676,26 @@ name = "linked-hash-map"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8dd5a6d5999d9907cda8ed67bbd137d3af8085216c2ac62de5be860bd41f304a"
+
+[[package]]
+name = "loadnext"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "envy",
+ "futures 0.3.6",
+ "hex",
+ "num",
+ "rand 0.7.3",
+ "serde",
+ "static_assertions",
+ "tokio 0.2.22",
+ "vlog",
+ "zksync",
+ "zksync_eth_signer",
+ "zksync_test_account",
+ "zksync_types",
+]
 
 [[package]]
 name = "loadtest"
@@ -3598,6 +3678,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "qstring"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d464fae65fff2680baf48019211ce37aaec0c78e9264c84a3e484717f965104e"
+dependencies = [
+ "percent-encoding 2.1.0",
+]
+
+[[package]]
 name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3680,7 +3769,7 @@ dependencies = [
  "rand_isaac",
  "rand_jitter",
  "rand_os",
- "rand_pcg",
+ "rand_pcg 0.1.2",
  "rand_xorshift",
  "winapi 0.3.9",
 ]
@@ -3696,6 +3785,7 @@ dependencies = [
  "rand_chacha 0.2.2",
  "rand_core 0.5.1",
  "rand_hc 0.2.0",
+ "rand_pcg 0.2.1",
 ]
 
 [[package]]
@@ -3805,12 +3895,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "rand_pcg"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16abd0c1b639e9eb4d7c50c0b8100b0d0f849be2349829c740fe8e6eb4816429"
+dependencies = [
+ "rand_core 0.5.1",
+]
+
+[[package]]
 name = "rand_xorshift"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cbf7e9e623549b0e21f6e97cf8ecf247c1a8fd2e8a992ae265314300b2455d5c"
 dependencies = [
  "rand_core 0.3.1",
+]
+
+[[package]]
+name = "rand_xoshiro"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9fcdd2e881d02f1d9390ae47ad8e5696a9e4be7b547a1da2afbc61973217004"
+dependencies = [
+ "rand_core 0.5.1",
 ]
 
 [[package]]
@@ -4150,6 +4258,97 @@ dependencies = [
 ]
 
 [[package]]
+name = "sentry"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "933beb0343c84eefd69a368318e9291b179e09e51982d49c65d7b362b0e9466f"
+dependencies = [
+ "httpdate",
+ "reqwest",
+ "sentry-backtrace",
+ "sentry-contexts",
+ "sentry-core",
+ "sentry-panic",
+]
+
+[[package]]
+name = "sentry-actix"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10bb43a95ba5d5fdb1bbe9ed8916697239c1732165ff271dec9d16807585870f"
+dependencies = [
+ "actix-web",
+ "futures-util",
+ "sentry-core",
+]
+
+[[package]]
+name = "sentry-backtrace"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38e528fb457baf53fcd6c90beb420705f35c12c3d8caed8817dcf7be00eff7c7"
+dependencies = [
+ "backtrace",
+ "lazy_static",
+ "regex",
+ "sentry-core",
+]
+
+[[package]]
+name = "sentry-contexts"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce3a560a34cffac347f0b588fc29b31db969e27bf57208f946d6a2d588668b0b"
+dependencies = [
+ "hostname",
+ "lazy_static",
+ "libc",
+ "regex",
+ "rustc_version",
+ "sentry-core",
+ "uname",
+]
+
+[[package]]
+name = "sentry-core"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17b8c235063c1007fd8e2fc7e35ce7eac09dd678d198ecc996daee33d46b3dcc"
+dependencies = [
+ "im",
+ "lazy_static",
+ "rand 0.7.3",
+ "sentry-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "sentry-panic"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04ee338d8292fcdcfb032929c9f53bc0dfac8e0b9d3096be79ceee96818851ed"
+dependencies = [
+ "sentry-backtrace",
+ "sentry-core",
+]
+
+[[package]]
+name = "sentry-types"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fbbea6debac0a24880a38239d4c2fc3dbb0b1b398f621bea03ed761796b7dfb"
+dependencies = [
+ "chrono",
+ "debugid",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "url 2.1.1",
+ "uuid",
+]
+
+[[package]]
 name = "serde"
 version = "1.0.117"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4189,6 +4388,17 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serde_repr"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2dc6b7951b17b051f3210b063f12cc17320e2fe30ae05b0fe2a3abb068551c76"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -4287,6 +4497,16 @@ dependencies = [
  "chrono",
  "num-bigint 0.2.6",
  "num-traits",
+]
+
+[[package]]
+name = "sized-chunks"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65e65d6a9f13cd78f361ea5a2cf53a45d67cdda421ba0316b9be101560f3d207"
+dependencies = [
+ "bitmaps",
+ "typenum",
 ]
 
 [[package]]
@@ -5231,6 +5451,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "uname"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b72f89f0ca32e4db1c04e2a72f5345d59796d4866a1ee0609084569f73683dc8"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "unicase"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5310,6 +5539,17 @@ dependencies = [
  "idna 0.2.0",
  "matches",
  "percent-encoding 2.1.0",
+ "serde",
+]
+
+[[package]]
+name = "uuid"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+dependencies = [
+ "getrandom 0.2.0",
+ "serde",
 ]
 
 [[package]]
@@ -5346,6 +5586,8 @@ checksum = "b5a972e5669d67ba988ce3dc826706fb0a8b01471c088cb0b6110b805cc36aed"
 name = "vlog"
 version = "1.0.0"
 dependencies = [
+ "sentry",
+ "sentry-actix",
  "tracing",
  "tracing-subscriber",
 ]
@@ -5731,10 +5973,12 @@ dependencies = [
  "metrics",
  "num",
  "once_cell",
+ "qstring",
  "regex",
  "reqwest",
  "serde",
  "serde_json",
+ "serde_repr",
  "structopt",
  "thiserror",
  "tiny-keccak 1.5.0",
@@ -5743,11 +5987,13 @@ dependencies = [
  "vlog",
  "web3",
  "zksync_api_client",
+ "zksync_balancer",
  "zksync_config",
  "zksync_contracts",
  "zksync_crypto",
  "zksync_eth_client",
  "zksync_eth_signer",
+ "zksync_gateway_watcher",
  "zksync_prometheus_exporter",
  "zksync_storage",
  "zksync_test_account",
@@ -5770,6 +6016,15 @@ dependencies = [
  "zksync_crypto",
  "zksync_types",
  "zksync_utils",
+]
+
+[[package]]
+name = "zksync_balancer"
+version = "1.0.0"
+dependencies = [
+ "futures 0.3.6",
+ "metrics",
+ "tokio 0.2.22",
 ]
 
 [[package]]
@@ -5845,11 +6100,13 @@ dependencies = [
  "tokio 0.2.22",
  "vlog",
  "web3",
+ "zksync_balancer",
  "zksync_config",
  "zksync_contracts",
  "zksync_crypto",
  "zksync_eth_client",
  "zksync_eth_signer",
+ "zksync_gateway_watcher",
  "zksync_prometheus_exporter",
  "zksync_state",
  "zksync_storage",
@@ -5861,7 +6118,6 @@ dependencies = [
 name = "zksync_crypto"
 version = "1.0.0"
 dependencies = [
- "anyhow",
  "base64 0.13.0",
  "ethabi",
  "fnv",
@@ -5874,6 +6130,7 @@ dependencies = [
  "recursive_aggregation_circuit",
  "serde",
  "serde_json",
+ "thiserror",
  "zksync_basic_types",
 ]
 
@@ -5949,6 +6206,7 @@ dependencies = [
  "zksync_contracts",
  "zksync_eth_client",
  "zksync_eth_signer",
+ "zksync_gateway_watcher",
  "zksync_prometheus_exporter",
  "zksync_storage",
  "zksync_types",
@@ -5973,6 +6231,48 @@ dependencies = [
  "thiserror",
  "tokio 0.2.22",
  "zksync_types",
+]
+
+[[package]]
+name = "zksync_forced_exit_requests"
+version = "1.0.0"
+dependencies = [
+ "actix-web",
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "ethabi",
+ "hex",
+ "log 0.4.11",
+ "metrics",
+ "num",
+ "tokio 0.2.22",
+ "vlog",
+ "web3",
+ "zksync_api",
+ "zksync_config",
+ "zksync_contracts",
+ "zksync_core",
+ "zksync_crypto",
+ "zksync_eth_signer",
+ "zksync_storage",
+ "zksync_test_account",
+ "zksync_types",
+]
+
+[[package]]
+name = "zksync_gateway_watcher"
+version = "1.0.0"
+dependencies = [
+ "futures 0.3.6",
+ "metrics",
+ "thiserror",
+ "tokio 0.2.22",
+ "vlog",
+ "web3",
+ "zksync_config",
+ "zksync_eth_client",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -6064,7 +6364,10 @@ dependencies = [
  "zksync_config",
  "zksync_core",
  "zksync_crypto",
+ "zksync_eth_client",
  "zksync_eth_sender",
+ "zksync_forced_exit_requests",
+ "zksync_gateway_watcher",
  "zksync_prometheus_exporter",
  "zksync_prover",
  "zksync_storage",
@@ -6077,11 +6380,11 @@ dependencies = [
 name = "zksync_state"
 version = "1.0.0"
 dependencies = [
- "anyhow",
  "criterion",
  "metrics",
  "num",
  "serde_json",
+ "thiserror",
  "vlog",
  "web3",
  "zksync_crypto",
@@ -6162,7 +6465,6 @@ dependencies = [
 name = "zksync_types"
 version = "1.0.0"
 dependencies = [
- "anyhow",
  "chrono",
  "criterion",
  "ethabi",
@@ -6174,6 +6476,7 @@ dependencies = [
  "secp256k1",
  "serde",
  "serde_json",
+ "thiserror",
  "tiny-keccak 1.5.0",
  "vlog",
  "web3",
@@ -6193,6 +6496,7 @@ dependencies = [
  "num",
  "serde",
  "serde_json",
+ "tokio 0.2.22",
 ]
 
 [[package]]

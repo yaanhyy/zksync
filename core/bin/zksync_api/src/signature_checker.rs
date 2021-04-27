@@ -21,9 +21,7 @@ use zksync_types::{
 };
 // Local uses
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
-use zksync_config::ZkSyncConfig;
 use zksync_eth_client::EthereumGateway;
-use zksync_types::network::Network;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 /// `TxVariant` is used to form a verify request. It is possible to wrap
@@ -31,7 +29,7 @@ use zksync_utils::panic_notify::ThreadPanicNotify;
 #[derive(Debug, Clone)]
 pub enum TxVariant {
     Tx(SignedZkSyncTx),
-    Batch(Vec<SignedZkSyncTx>, EthBatchSignData),
+    Batch(Vec<SignedZkSyncTx>, Option<EthBatchSignData>),
 }
 
 /// Wrapper on a `TxVariant` which guarantees that (a batch of)
@@ -47,14 +45,14 @@ impl VerifiedTx {
     /// Checks the (batch of) transaction(s) correctness by verifying its
     /// Ethereum signature (if required) and `ZKSync` signature.
     pub async fn verify(
-        request: &mut VerifyTxSignatureRequest,
+        request_data: RequestData,
         eth_checker: &EthereumChecker,
-        network: Network,
     ) -> Result<Self, TxAddError> {
-        verify_eth_signature(request, eth_checker, network).await?;
-        verify_tx_correctness(&mut request.tx)?;
+        verify_eth_signature(&request_data, eth_checker).await?;
+        let mut tx_variant = request_data.get_tx_variant();
+        verify_tx_correctness(&mut tx_variant)?;
 
-        Ok(Self(request.tx.clone()))
+        Ok(Self(tx_variant))
     }
 
     /// Creates a verified wrapper without actually verifying the original data.
@@ -72,7 +70,7 @@ impl VerifiedTx {
     }
 
     /// Takes the Vec of `SignedZkSyncTx` and the verified signature data out of the wrapper.
-    pub fn unwrap_batch(self) -> (Vec<SignedZkSyncTx>, EthBatchSignData) {
+    pub fn unwrap_batch(self) -> (Vec<SignedZkSyncTx>, Option<EthBatchSignData>) {
         match self.0 {
             TxVariant::Batch(txs, batch_sign_data) => (txs, batch_sign_data),
             TxVariant::Tx(_) => panic!("called `unwrap_batch` on a `Tx` value"),
@@ -82,32 +80,30 @@ impl VerifiedTx {
 
 /// Verifies the Ethereum signature of the (batch of) transaction(s).
 async fn verify_eth_signature(
-    request: &VerifyTxSignatureRequest,
+    request_data: &RequestData,
     eth_checker: &EthereumChecker,
-    network: Network,
 ) -> Result<(), TxAddError> {
-    let accounts = &request.senders;
-    let tokens = &request.tokens;
-
-    // TODO: Remove this code after Golem update [ZKS-173]
-    if (network == Network::Rinkeby || network == Network::Localhost)
-        && tokens.iter().any(|t| t.symbol == "GNT")
-    {
-        return Ok(());
-    }
-
-    match &request.tx {
-        TxVariant::Tx(tx) => {
-            if accounts.len() != 1 || tokens.len() != 1 {
-                return Err(TxAddError::Other);
-            }
-            verify_eth_signature_single_tx(tx, accounts[0], tokens[0].clone(), eth_checker).await?;
+    match request_data {
+        RequestData::Tx(request) => {
+            verify_eth_signature_single_tx(
+                &request.tx,
+                request.sender,
+                request.token.clone(),
+                eth_checker,
+            )
+            .await?;
         }
-        TxVariant::Batch(txs, batch_sign_data) => {
-            if accounts.len() != txs.len() {
+        RequestData::Batch(request) => {
+            let accounts = &request.senders;
+            let tokens = &request.tokens;
+            let txs = &request.txs;
+
+            if accounts.len() != request.txs.len() {
                 return Err(TxAddError::Other);
             }
-            verify_eth_signature_txs_batch(txs, accounts, batch_sign_data, eth_checker).await?;
+            if let Some(batch_sign_data) = &request.batch_sign_data {
+                verify_eth_signature_txs_batch(txs, accounts, batch_sign_data, eth_checker).await?;
+            }
             // In case there're signatures provided for some of transactions
             // we still verify them.
             for ((tx, &account), token) in
@@ -276,29 +272,58 @@ fn verify_tx_correctness(tx: &mut TxVariant) -> Result<(), TxAddError> {
     Ok(())
 }
 
-/// Request for the signature check.
 #[derive(Debug)]
-pub struct VerifyTxSignatureRequest {
-    pub tx: TxVariant,
-    /// Senders of transactions. This field is needed since for `ForcedExit` account affected by
+pub struct TxRequest {
+    pub tx: SignedZkSyncTx,
+    /// Sender of transaction. This field is needed since for `ForcedExit` account affected by
     /// the transaction and actual sender can be different. Thus, we require request sender to
     /// perform a database query and fetch actual addresses if necessary.
-    pub senders: Vec<Address>,
-    /// Resolved tokens might be used to obtain old-formatted 2-FA messages.
+    pub sender: Address,
+    /// Resolved token might be used to obtain old-formatted 2-FA messages.
     /// Needed for backwards compatibility.
+    pub token: Token,
+}
+
+#[derive(Debug)]
+pub struct BatchRequest {
+    pub txs: Vec<SignedZkSyncTx>,
+    pub batch_sign_data: Option<EthBatchSignData>,
+    pub senders: Vec<Address>,
     pub tokens: Vec<Token>,
+}
+
+/// Request for the signature check.
+#[derive(Debug)]
+pub struct VerifySignatureRequest {
+    pub data: RequestData,
     /// Channel for sending the check response.
     pub response: oneshot::Sender<Result<VerifiedTx, TxAddError>>,
+}
+
+#[derive(Debug)]
+pub enum RequestData {
+    Tx(TxRequest),
+    Batch(BatchRequest),
+}
+
+impl RequestData {
+    pub fn get_tx_variant(&self) -> TxVariant {
+        match &self {
+            RequestData::Tx(request) => TxVariant::Tx(request.tx.clone()),
+            RequestData::Batch(request) => {
+                TxVariant::Batch(request.txs.clone(), request.batch_sign_data.clone())
+            }
+        }
+    }
 }
 
 /// Main routine of the concurrent signature checker.
 /// See the module documentation for details.
 pub fn start_sign_checker_detached(
-    config: ZkSyncConfig,
-    input: mpsc::Receiver<VerifyTxSignatureRequest>,
+    client: EthereumGateway,
+    input: mpsc::Receiver<VerifySignatureRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
-    let client = EthereumGateway::from_config(&config);
     let eth_checker = EthereumChecker::new(client);
 
     /// Main signature check requests handler.
@@ -306,16 +331,15 @@ pub fn start_sign_checker_detached(
     /// notifying the request sender about the check result.
     async fn checker_routine(
         handle: Handle,
-        mut input: mpsc::Receiver<VerifyTxSignatureRequest>,
+        mut input: mpsc::Receiver<VerifySignatureRequest>,
         eth_checker: EthereumChecker,
-        eth_network: Network,
     ) {
-        while let Some(mut request) = input.next().await {
+        while let Some(VerifySignatureRequest { data, response }) = input.next().await {
             let eth_checker = eth_checker.clone();
             handle.spawn(async move {
-                let resp = VerifiedTx::verify(&mut request, &eth_checker, eth_network).await;
+                let resp = VerifiedTx::verify(data, &eth_checker).await;
 
-                request.response.send(resp).unwrap_or_default();
+                response.send(resp).unwrap_or_default();
             });
         }
     }
@@ -331,12 +355,7 @@ pub fn start_sign_checker_detached(
                 .build()
                 .expect("failed to build runtime for signature processor");
             let handle = runtime.handle().clone();
-            runtime.block_on(checker_routine(
-                handle,
-                input,
-                eth_checker,
-                config.chain.eth.network,
-            ));
+            runtime.block_on(checker_routine(handle, input, eth_checker));
         })
         .expect("failed to start signature checker thread");
 }
