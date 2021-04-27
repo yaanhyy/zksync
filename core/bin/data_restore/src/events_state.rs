@@ -91,9 +91,9 @@ impl EventsState {
         governance_contract: &(ethabi::Contract, Contract<T>),
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
+        last_store_block: u32
     ) -> Result<(Vec<BlockEvent>, Vec<NewTokenEvent>, u64), anyhow::Error> {
-        self.remove_verified_events();
-
+        self.remove_verified_events(last_store_block);
 
         let (events, token_events, to_block_number) =
             EventsState::get_new_events_and_last_watched_block(
@@ -105,10 +105,9 @@ impl EventsState {
                 end_eth_blocks_offset,
             )
             .await?;
-
         self.last_watched_eth_block_number = to_block_number;
         for (zksync_contract, block_events) in events {
-            self.update_blocks_state(zksync_contract, &block_events);
+            self.update_blocks_state(zksync_contract, &block_events );
         }
 
         let mut events_to_return = self.committed_events.clone();
@@ -343,10 +342,9 @@ impl EventsState {
             let transaction_hash = log
                 .transaction_hash
                 .expect("There are no tx hash in block event");
-            let block_num = log.topics[1];
 
             let mut block = BlockEvent {
-                block_num: BlockNumber(U256::from(block_num.as_bytes()).as_u32()),
+                block_num: BlockNumber(U256::from(log.topics[1].as_bytes()).as_u32()),
                 transaction_hash,
                 block_type: EventType::Committed,
                 contract_version: contract.version,
@@ -362,14 +360,18 @@ impl EventsState {
     }
 
     /// Removes verified committed blocks events and all verified
-    fn remove_verified_events(&mut self) {
-        let count_to_remove = self.verified_events.len();
-        self.verified_events.clear();
-        if (count_to_remove <= self.committed_events.len()) {
-            self.committed_events.drain(0..count_to_remove);
-        } else {
-            self.committed_events.clear();
-        }
+    fn remove_verified_events(&mut self, last_store_block: u32) {
+        self.verified_events.retain(|&x| x.block_num.0 > last_store_block);
+        self.committed_events.retain(|&x| x.block_num.0 > last_store_block);
+        // let count_to_remove = self.verified_events.len();
+        // let count_commited_events = self.committed_events.len();
+        // if (count_to_remove <= self.committed_events.len()) {
+        //     self.committed_events.drain(0..count_to_remove);
+        //     self.verified_events.clear();
+        // } else {
+        //     self.committed_events.clear();
+        //     self.verified_events.drain(0..count_commited_events);
+        // }
     }
 
     /// Returns only verified committed blocks from verified
