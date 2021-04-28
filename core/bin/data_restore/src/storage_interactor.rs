@@ -92,6 +92,14 @@ pub trait StorageInteractor {
     async fn get_storage_state(&mut self) -> StorageUpdateState;
 
     async fn get_last_store_block(&mut self) -> BlockNumber;
+
+    async fn load_block(
+        & mut self,
+        block: BlockNumber,
+    ) -> anyhow::Result<Option<Block>>;
+
+    async fn save_block( & mut self,
+                         block: Block);
 }
 
 /// Returns Rollup contract event from its stored representation

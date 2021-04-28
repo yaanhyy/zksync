@@ -22,6 +22,10 @@ use ethabi::Address;
 
 use std::marker::PhantomData;
 
+use zksync_witness_generator::witness_generator::WitnessGenerator;
+use zksync_witness_generator::database_interface::DatabaseInterface;
+use zksync_witness_generator::witness_generator::BlockInfo;
+use zksync_witness_generator::database::Database;
 /// Storage state update:
 /// - None - The state is updated completely last time - start from fetching the new events
 /// - Events - The events fetched and saved successfully - now get operations from them and update tree
@@ -77,6 +81,7 @@ impl<T, I> DataRestoreDriver<T, I>
 where
     T: Transport,
     I: StorageInteractor,
+
 {
     /// Returns new data restore driver with empty events and tree states.
     ///
@@ -215,7 +220,7 @@ where
     }
 
     /// Stops states from storage
-    pub async fn load_state_from_storage(&mut self, interactor: &mut I) -> bool {
+    pub async fn load_state_from_storage(&mut self, interactor: &mut I, database: Database) -> bool {
         vlog::info!("Loading state from storage");
         let state = interactor.get_storage_state().await;
         self.events_state = interactor.get_block_events_state_from_storage().await;
@@ -235,7 +240,7 @@ where
                 //delete used ops when program exit unexpected
                 new_ops_blocks.retain(|x| x.block_num>last_store_block);
                 // Update tree
-                self.update_tree_state(interactor, new_ops_blocks).await;
+                self.update_tree_state(interactor, new_ops_blocks, database).await;
             }
             StorageUpdateState::Operations => {
                 // Update operations
@@ -243,7 +248,7 @@ where
                 //delete used ops when program exit unexpected
                 new_ops_blocks.retain(|x| x.block_num>last_store_block);
                 // Update tree
-                self.update_tree_state(interactor, new_ops_blocks).await;
+                self.update_tree_state(interactor, new_ops_blocks, database).await;
             }
             StorageUpdateState::None => {}
         }
@@ -260,7 +265,7 @@ where
     }
 
     /// Activates states updates
-    pub async fn run_state_update(&mut self, interactor: &mut I) {
+    pub async fn run_state_update(&mut self, interactor: &mut I, database: Database) {
         let mut last_watched_block: u64 = self.events_state.last_watched_eth_block_number;
         let mut final_hash_was_found = false;
         loop {
@@ -273,7 +278,7 @@ where
 
                 if !new_ops_blocks.is_empty() {
                     // Update tree
-                    self.update_tree_state(interactor, new_ops_blocks).await;
+                    self.update_tree_state(interactor, new_ops_blocks, database.clone()).await;
 
                     let total_verified_blocks =
                         self.zksync_contract.get_total_verified_blocks().await;
@@ -361,10 +366,10 @@ where
     ///
     /// * `new_ops_blocks` - the new Rollup operations blocks
     ///
-    async fn update_tree_state(&mut self, interactor: &mut I, new_ops_blocks: Vec<RollupOpsBlock>) {
+    async fn update_tree_state(&mut self, interactor: &mut I, new_ops_blocks: Vec<RollupOpsBlock>, database: Database) {
         let mut blocks = vec![];
         let mut updates = vec![];
-        let mut count = 0;
+        // let mut count = 0;
         for op_block in new_ops_blocks {
             let (block, acc_updates) = self
                 .tree_state
@@ -372,16 +377,40 @@ where
                 .expect("Updating tree state: cant update tree from operations");
             blocks.push(block.clone());
             updates.push(acc_updates.clone());
-
+            let witness_gen = WitnessGenerator::new(
+                database.clone(),
+                std::time::Duration::from_secs(1),
+                BlockNumber(1),
+                BlockNumber(1),
+            );
 
             interactor
-                .update_tree_state(block.clone(), acc_updates.clone())
+                .save_block(block.clone())
                 .await;
-            count += 1;
-        }
-        for i in 0..count {
+            // interactor
+            //     .update_tree_state(block.clone(), acc_updates.clone())
+            //     .await;
+            let should_block = match  witness_gen.should_work_on_block(block.block_number).await {
+                Ok(should_work) => should_work,
+                Err(err) => {
+                    vlog::warn!("witness for block {} check failed: {}", block.block_number, err);
+                    continue;
+                }
+            };
+            if let BlockInfo::NoWitness(block) = should_block {
+                let block_number = block.block_number;
+                if let Err(err) = witness_gen.prepare_witness_and_save_it(block).await {
+                    vlog::warn!("Witness generator ({},{}) failed to prepare witness for block: {}, err: {}",
+                                1, 1, block_number, err);
+                    continue; // Retry the same block on the next iteration.
+                }
+            }
 
+            // count += 1;
         }
+        // for i in 0..count {
+        //
+        // }
 
         vlog::debug!("Updated state");
     }

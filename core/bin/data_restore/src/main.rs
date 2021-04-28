@@ -13,9 +13,9 @@ use zksync_data_restore::{
     add_tokens_to_storage, data_restore_driver::DataRestoreDriver,
     database_storage_interactor::DatabaseStorageInteractor, END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
 };
-use zksync_types::network::Network;
-
-
+use zksync_types::{network::Network, BlockNumber};
+use zksync_witness_generator::database::Database;
+use zksync_witness_generator::witness_generator;
 #[derive(StructOpt)]
 #[structopt(
     name = "Data restore driver",
@@ -86,7 +86,7 @@ async fn main() {
     let connection_pool = ConnectionPool::new(Some(1));
     let config_opts = ETHClientConfig::from_env();
     vlog::info!("config_opts:{:?}", config_opts);
-    let opt = Opt::from_args();
+    let mut opt = Opt::from_args();
 
     let web3_url = opt.web3_url.unwrap_or_else(|| config_opts.web3_url());
 
@@ -120,8 +120,11 @@ async fn main() {
         contract,
         config.available_block_chunk_sizes,
     );
+    let connection_pool = ConnectionPool::new(Some(2));
+    let database = Database::new(connection_pool.clone());
 
     let mut interactor = DatabaseStorageInteractor::new(storage);
+    // opt.genesis = true;
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address
     if opt.genesis {
         // We have to load pre-defined tokens into the database before restoring state,
@@ -132,10 +135,10 @@ async fn main() {
             .set_genesis_state(&mut interactor, config.genesis_tx_hash)
             .await;
     }
-
-    if opt.continue_mode && driver.load_state_from_storage(&mut interactor).await {
+    opt.continue_mode = true;
+    if opt.continue_mode && driver.load_state_from_storage(&mut interactor, database.clone()).await {
         std::process::exit(0);
     }
 
-    driver.run_state_update(&mut interactor).await;
+    driver.run_state_update(&mut interactor, database).await;
 }

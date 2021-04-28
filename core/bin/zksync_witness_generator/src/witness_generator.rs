@@ -29,7 +29,7 @@ pub struct WitnessGenerator<DB: DatabaseInterface> {
 }
 
 #[derive(Debug)]
-enum BlockInfo {
+pub enum BlockInfo {
     NotReadyBlock,
     WithWitness,
     NoWitness(Block),
@@ -71,7 +71,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
     }
 
     /// Returns status of witness for block with index block_number
-    async fn should_work_on_block(
+    pub async fn should_work_on_block(
         &self,
         block_number: BlockNumber,
     ) -> Result<BlockInfo, anyhow::Error> {
@@ -191,7 +191,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
         Ok(circuit_account_tree)
     }
 
-    async fn prepare_witness_and_save_it(&self, block: Block) -> anyhow::Result<()> {
+    pub async fn prepare_witness_and_save_it(&self, block: Block) -> anyhow::Result<()> {
         let start = time::Instant::now();
         let timer = time::Instant::now();
         let mut storage = self.database.acquire_connection().await?;

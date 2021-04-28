@@ -38,9 +38,9 @@ use zksync_utils::panic_notify::ThreadPanicNotify;
 mod tests;
 
 pub mod database;
-mod database_interface;
+pub mod database_interface;
 mod scaler;
-mod witness_generator;
+pub mod witness_generator;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PayloadAuthToken {
