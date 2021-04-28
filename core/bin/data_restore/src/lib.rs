@@ -4,10 +4,10 @@ pub mod database_storage_interactor;
 pub mod eth_tx_helpers;
 pub mod events;
 pub mod events_state;
-pub mod inmemory_storage_interactor;
 pub mod rollup_ops;
 pub mod storage_interactor;
 pub mod tree_state;
+pub mod witness_gen;
 
 #[cfg(test)]
 mod tests;

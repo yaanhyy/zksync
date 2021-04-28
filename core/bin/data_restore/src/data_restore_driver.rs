@@ -370,14 +370,17 @@ where
                 .tree_state
                 .update_tree_states_from_ops_block(&op_block, &self.available_block_chunk_sizes)
                 .expect("Updating tree state: cant update tree from operations");
-            blocks.push(block);
-            updates.push(acc_updates);
+            blocks.push(block.clone());
+            updates.push(acc_updates.clone());
+
+
+            interactor
+                .update_tree_state(block.clone(), acc_updates.clone())
+                .await;
             count += 1;
         }
         for i in 0..count {
-            interactor
-                .update_tree_state(blocks[i].clone(), updates[i].clone())
-                .await;
+
         }
 
         vlog::debug!("Updated state");
@@ -423,4 +426,6 @@ where
 
         blocks
     }
+
+
 }

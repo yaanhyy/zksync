@@ -9,7 +9,7 @@ use zksync_types::block::Block;
 use zksync_types::{Nonce, TokenId};
 
 use crate::{
-    data_restore::verify_restore,
+    // data_restore::verify_restore,
     eth_account::{parse_ether, EthereumAccount},
     external_commands::{deploy_contracts, get_test_accounts},
     state_keeper_utils::spawn_state_keeper,
@@ -110,16 +110,16 @@ pub async fn perform_basic_tests() {
     .await;
     let tokens = vec![token];
 
-    verify_restore(
-        &testkit_config.web3_url,
-        &contracts,
-        fee_account_address,
-        test_setup.get_accounts_state().await,
-        tokens,
-        test_setup.last_committed_block.new_root_hash,
-        testkit_config.available_block_chunk_sizes,
-    )
-    .await;
+    // verify_restore(
+    //     &testkit_config.web3_url,
+    //     &contracts,
+    //     fee_account_address,
+    //     test_setup.get_accounts_state().await,
+    //     tokens,
+    //     test_setup.last_committed_block.new_root_hash,
+    //     testkit_config.available_block_chunk_sizes,
+    // )
+    // .await;
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");

@@ -36,8 +36,9 @@ zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
 zksync_utils = { path = "../../lib/utils", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
+zksync_witness_generator = { path= "../zksync_witness_generator"}
 
 [dev-dependencies]
 jsonrpc-core = "14.0.0"
-db_test_macro = { path = "../../lib/storage/db_test_macro" }
+db_test_macro = {path = "../../lib/storage/db_test_macro" }
 futures = "0.3.5"

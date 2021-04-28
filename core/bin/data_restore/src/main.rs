@@ -15,6 +15,7 @@ use zksync_data_restore::{
 };
 use zksync_types::network::Network;
 
+
 #[derive(StructOpt)]
 #[structopt(
     name = "Data restore driver",

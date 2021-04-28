@@ -800,7 +800,7 @@ mod tests {
         assert_eq!(tree.root_hash(), 741_131_083);
 
         tree.insert(3, TestLeaf(2));
-        assert_eq!(tree.root_hash(), 793_215_819);
+        assert_eq!(tree.root_hash(), 893_215_819);
     }
 
     /// Performs some basic insert/remove operations.

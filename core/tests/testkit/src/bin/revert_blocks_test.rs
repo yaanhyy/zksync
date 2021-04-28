@@ -6,7 +6,7 @@ use zksync_types::{block::Block, AccountId, AccountMap, AccountTree};
 use zksync_testkit::zksync_account::ZkSyncETHAccountData;
 use zksync_testkit::*;
 use zksync_testkit::{
-    data_restore::verify_restore,
+    // data_restore::verify_restore,
     scenarios::{perform_basic_operations, BlockProcessing},
 };
 use zksync_types::{BlockNumber, Nonce, TokenId};
@@ -231,16 +231,16 @@ async fn revert_blocks_test() {
     sender.send(()).expect("sk stop send");
     handler.join().expect("sk thread join");
 
-    verify_restore(
-        test_config.web3_url.as_str(),
-        &contracts,
-        fee_account.address,
-        balance_tree_to_account_map(&state.tree),
-        vec![TokenId(0)],
-        test_setup.current_state_root.unwrap(),
-        test_config.available_block_chunk_sizes,
-    )
-    .await;
+    // verify_restore(
+    //     test_config.web3_url.as_str(),
+    //     &contracts,
+    //     fee_account.address,
+    //     balance_tree_to_account_map(&state.tree),
+    //     vec![TokenId(0)],
+    //     test_setup.current_state_root.unwrap(),
+    //     test_config.available_block_chunk_sizes,
+    // )
+    // .await;
     println!("some blocks are committed and verified \n\n");
 }
 

@@ -307,4 +307,30 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .await
             .expect("Cant load storage state")
     }
+
+    // pub async fn should_work_on_block(
+    //     &mut self,
+    //     block_number: BlockNumber,
+    // ) -> Result<BlockInfo, anyhow::Error> {
+    //     let mut transaction = self.storage.start_transaction().await?;
+    //     let block = transaction
+    //         .chain()
+    //         .load_block(&mut transaction, block_number)
+    //         .await?;
+    //     let block_info = if let Some(block) = block {
+    //         let witness = self
+    //             .database
+    //             .load_witness(&mut transaction, block_number)
+    //             .await?;
+    //         if witness.is_none() {
+    //             BlockInfo::NoWitness(block)
+    //         } else {
+    //             BlockInfo::WithWitness
+    //         }
+    //     } else {
+    //         BlockInfo::NotReadyBlock
+    //     };
+    //     transaction.commit().await?;
+    //     Ok(block_info)
+    // }
 }
