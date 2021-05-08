@@ -232,13 +232,13 @@ where
             tree_state.fee_acc_id,            // fee account
         );
 
-        let last_store_block = interactor.get_last_store_block().await;
+     //   let last_store_block = interactor.get_last_store_block().await;
         match state {
             StorageUpdateState::Events => {
                 // Update operations
                 let mut new_ops_blocks = self.update_operations_state(interactor).await;
                 //delete used ops when program exit unexpected
-                new_ops_blocks.retain(|x| x.block_num>last_store_block);
+             //   new_ops_blocks.retain(|x| x.block_num>last_store_block);
                 // Update tree
                 self.update_tree_state(interactor, new_ops_blocks, database).await;
             }
@@ -246,7 +246,7 @@ where
                 // Update operations
                 let mut new_ops_blocks = interactor.get_ops_blocks_from_storage().await;
                 //delete used ops when program exit unexpected
-                new_ops_blocks.retain(|x| x.block_num>last_store_block);
+              //  new_ops_blocks.retain(|x| x.block_num>last_store_block);
                 // Update tree
                 self.update_tree_state(interactor, new_ops_blocks, database).await;
             }
@@ -384,27 +384,28 @@ where
                 BlockNumber(1),
             );
 
-            interactor
-                .save_block(block.clone())
-                .await;
             // interactor
-            //     .update_tree_state(block.clone(), acc_updates.clone())
+            //     .save_block(block.clone())
             //     .await;
-            let should_block = match  witness_gen.should_work_on_block(block.block_number).await {
-                Ok(should_work) => should_work,
-                Err(err) => {
-                    vlog::warn!("witness for block {} check failed: {}", block.block_number, err);
-                    continue;
-                }
-            };
-            if let BlockInfo::NoWitness(block) = should_block {
-                let block_number = block.block_number;
-                if let Err(err) = witness_gen.prepare_witness_and_save_it(block).await {
-                    vlog::warn!("Witness generator ({},{}) failed to prepare witness for block: {}, err: {}",
-                                1, 1, block_number, err);
-                    continue; // Retry the same block on the next iteration.
-                }
-            }
+            interactor
+                .update_tree_state(block.clone(), acc_updates.clone())
+                .await;
+
+            // let should_block = match  witness_gen.should_work_on_block(block.block_number).await {
+            //     Ok(should_work) => should_work,
+            //     Err(err) => {
+            //         vlog::warn!("witness for block {} check failed: {}", block.block_number, err);
+            //         continue;
+            //     }
+            // };
+            // if let BlockInfo::NoWitness(block) = should_block {
+            //     let block_number = block.block_number;
+            //     if let Err(err) = witness_gen.prepare_witness_and_save_it(block).await {
+            //         vlog::warn!("Witness generator ({},{}) failed to prepare witness for block: {}, err: {}",
+            //                     1, 1, block_number, err);
+            //         continue; // Retry the same block on the next iteration.
+            //     }
+            // }
 
             // count += 1;
         }
