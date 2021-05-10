@@ -387,25 +387,25 @@ where
             // interactor
             //     .save_block(block.clone())
             //     .await;
-            interactor
-                .update_tree_state(block.clone(), acc_updates.clone())
-                .await;
+            // interactor
+            //     .update_tree_state(block.clone(), acc_updates.clone())
+            //     .await;
 
-            // let should_block = match  witness_gen.should_work_on_block(block.block_number).await {
-            //     Ok(should_work) => should_work,
-            //     Err(err) => {
-            //         vlog::warn!("witness for block {} check failed: {}", block.block_number, err);
-            //         continue;
-            //     }
-            // };
-            // if let BlockInfo::NoWitness(block) = should_block {
-            //     let block_number = block.block_number;
-            //     if let Err(err) = witness_gen.prepare_witness_and_save_it(block).await {
-            //         vlog::warn!("Witness generator ({},{}) failed to prepare witness for block: {}, err: {}",
-            //                     1, 1, block_number, err);
-            //         continue; // Retry the same block on the next iteration.
-            //     }
-            // }
+            let should_block = match  witness_gen.should_work_on_block(block.block_number).await {
+                Ok(should_work) => should_work,
+                Err(err) => {
+                    vlog::warn!("witness for block {} check failed: {}", block.block_number, err);
+                    continue;
+                }
+            };
+            if let BlockInfo::NoWitness(block) = should_block {
+                let block_number = block.block_number;
+                if let Err(err) = witness_gen.prepare_witness_and_save_it(block).await {
+                    vlog::warn!("Witness generator ({},{}) failed to prepare witness for block: {}, err: {}",
+                                1, 1, block_number, err);
+                    continue; // Retry the same block on the next iteration.
+                }
+            }
 
             // count += 1;
         }

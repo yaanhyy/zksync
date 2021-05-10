@@ -124,7 +124,7 @@ async fn main() {
     let database = Database::new(connection_pool.clone());
 
     let mut interactor = DatabaseStorageInteractor::new(storage);
-     opt.genesis = true;
+    // opt.genesis = true;
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address
     if opt.genesis {
         // We have to load pre-defined tokens into the database before restoring state,
@@ -135,7 +135,7 @@ async fn main() {
             .set_genesis_state(&mut interactor, config.genesis_tx_hash)
             .await;
     }
-    //opt.continue_mode = true;
+    opt.continue_mode = true;
     if opt.continue_mode && driver.load_state_from_storage(&mut interactor, database.clone()).await {
         std::process::exit(0);
     }
