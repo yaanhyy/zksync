@@ -787,6 +787,10 @@ pub fn build_block_witness<'a>(
             .expect("root_after_fees not present"),
         block.new_root_hash
     );
+    vlog::info!(
+        "block hash{:?}",
+        block.new_root_hash
+    );
     witness_accum.calculate_pubdata_commitment();
 
     let mut block_commitment = block.block_commitment.as_bytes().to_vec();

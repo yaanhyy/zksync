@@ -384,9 +384,9 @@ where
                 BlockNumber(1),
             );
 
-            // interactor
-            //     .save_block(block.clone())
-            //     .await;
+            interactor
+                .save_block(block.clone())
+                .await;
             // interactor
             //     .update_tree_state(block.clone(), acc_updates.clone())
             //     .await;
