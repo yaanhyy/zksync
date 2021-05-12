@@ -12,8 +12,31 @@ module.exports = {
       version: "^0.7.0", // A version or constraint - Ex. "^0.5.0"
                          // Can also be set to "native" to use a native solc
       parser: "solcjs",  // Leverages solc-js purely for speedy parsing
+      settings: {          // See the solidity docs for advice about optimization and evmVersion
+        optimizer: {
+          enabled: true,
+          runs: 200
+        },
+        "metadata": {
+          "useLiteralContent": true
+        },
+        "libraries": {},
+        "remappings": [],
+        "outputSelection": {
+          "*": {
+            "*": [
+              "evm.bytecode",
+              "evm.deployedBytecode",
+              "abi"
+            ]
+          }
+        },
+        evmVersion: "istanbul"
+      }
+
     }
   },
+
   // Uncommenting the defaults below 
   // provides for an easier quick-start with Ganache.
   // You can also follow this format for other networks;
