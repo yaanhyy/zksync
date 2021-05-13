@@ -414,6 +414,8 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .fetch_one(transaction.conn())
         .await?
+        .id;
+
 
         if operation.is_commit() {
             sqlx::query!(
