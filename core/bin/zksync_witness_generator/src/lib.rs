@@ -418,7 +418,7 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                         start_block,
                         block_step
                     );
-                    start_block =start_block - 1 ;
+                    //start_block =start_block - 1 ;
                     let pool_maintainer = witness_generator::WitnessGenerator::new(
                         database.clone(),
                         witness_generator_opts.prepare_data_interval(),

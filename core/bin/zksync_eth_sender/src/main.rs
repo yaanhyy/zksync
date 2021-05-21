@@ -31,8 +31,8 @@ async fn main() -> anyhow::Result<()> {
     let gateway_watcher_task_opt = run_gateway_watcher_if_multiplexed(eth_gateway.clone(), &config);
 
     // Run prometheus data exporter.
-    let (prometheus_task_handle, _) =
-        run_prometheus_exporter(pool.clone(), config.api.prometheus.port, false);
+    // let (prometheus_task_handle, _) =
+    //     run_prometheus_exporter(pool.clone(), config.api.prometheus.port, false);
 
     let task_handle = run_eth_sender(pool, eth_gateway, config);
 
@@ -43,9 +43,9 @@ async fn main() -> anyhow::Result<()> {
         _ = async { gateway_watcher_task_opt.unwrap().await }, if gateway_watcher_task_opt.is_some() => {
             panic!("Gateway Watcher actors aren't supposed to finish their execution")
         },
-        _ = async { prometheus_task_handle.await } => {
-            panic!("Prometheus exporter actors aren't supposed to finish their execution")
-        },
+        // _ = async { prometheus_task_handle.await } => {
+        //     panic!("Prometheus exporter actors aren't supposed to finish their execution")
+        // },
         _ = async { stop_signal_receiver.next().await } => {
             vlog::warn!("Stop signal received, shutting down");
         }

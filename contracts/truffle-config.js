@@ -54,11 +54,11 @@ module.exports = {
       port: 8545,
       network_id: "3"
     },
-    goerli: {
-      provider: new HDWalletProvider("forest antenna burden wheel prefer isolate claw fire chief iron happy nest", 'https://goerli.infura.io/v3/3be7a6998574443381559f7075192e70'),
+    bsc: {
+      provider: new HDWalletProvider("forest antenna burden wheel prefer isolate claw fire chief iron happy nest", 'https://data-seed-prebsc-1-s1.binance.org:8545/'),
       host: "172.18.11.36",
       port: 10234,
-      network_id: "5",
+      network_id: "97",
       networkCheckTimeout: 999999, 
     },
     heco: {

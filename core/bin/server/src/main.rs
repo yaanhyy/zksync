@@ -29,9 +29,10 @@ struct Opt {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let opt = Opt::from_args();
+    let mut opt = Opt::from_args();
     let config = ZkSyncConfig::from_env();
     let mut _sentry_guard = None;
+    opt.genesis = true;
     let server_mode = if opt.genesis {
         ServerCommand::Genesis
     } else {

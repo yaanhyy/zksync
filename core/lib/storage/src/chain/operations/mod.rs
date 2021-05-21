@@ -446,8 +446,9 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         }
 
         if !operation.is_create_proof() {
+            vlog::info!("is_create_proof: true");
             sqlx::query!(
-                "INSERT INTO eth_unprocessed_aggregated_ops (op_id)
+                "INSERT INTO eth_unprocessed_aggregated_ops (op_id) \
                 VALUES ($1)",
                 id
             )
