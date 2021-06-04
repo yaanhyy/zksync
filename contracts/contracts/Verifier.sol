@@ -1,7 +1,10 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-
 pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+
+
 
 import "./KeysWithPlonkVerifier.sol";
 import "./Config.sol";
@@ -21,16 +24,6 @@ contract Verifier is KeysWithPlonkVerifier, KeysWithPlonkVerifierOld, Config {
         uint256[] memory _individual_vks_inputs,
         uint256[16] memory _subproofs_limbs
     ) external view returns (bool) {
-        // #if DUMMY_VERIFIER
-        uint256 oldGasValue = gasleft();
-        // HACK: ignore warnings from unused variables
-        abi.encode(_recursiveInput, _proof, _vkIndexes, _individual_vks_inputs, _subproofs_limbs);
-        uint256 tmp;
-        while (gasleft() + 500000 > oldGasValue) {
-            tmp += 1;
-        }
-        return true;
-        // #else
         for (uint256 i = 0; i < _individual_vks_inputs.length; ++i) {
             uint256 commitment = _individual_vks_inputs[i];
             _individual_vks_inputs[i] = commitment & INPUT_MASK;
@@ -38,17 +31,16 @@ contract Verifier is KeysWithPlonkVerifier, KeysWithPlonkVerifierOld, Config {
         VerificationKey memory vk = getVkAggregated(uint32(_vkIndexes.length));
 
         return
-            verify_serialized_proof_with_recursion(
-                _recursiveInput,
-                _proof,
-                VK_TREE_ROOT,
-                VK_MAX_INDEX,
-                _vkIndexes,
-                _individual_vks_inputs,
-                _subproofs_limbs,
-                vk
-            );
-        // #endif
+        verify_serialized_proof_with_recursion(
+            _recursiveInput,
+            _proof,
+            VK_TREE_ROOT,
+            VK_MAX_INDEX,
+            _vkIndexes,
+            _individual_vks_inputs,
+            _subproofs_limbs,
+            vk
+        );
     }
 
     function verifyExitProof(
@@ -59,7 +51,8 @@ contract Verifier is KeysWithPlonkVerifier, KeysWithPlonkVerifierOld, Config {
         uint128 _amount,
         uint256[] calldata _proof
     ) external view returns (bool) {
-        bytes32 commitment = sha256(abi.encodePacked(_rootHash, _accountId, _owner, _tokenId, _amount));
+        bytes32 commitment =
+        sha256(abi.encodePacked(uint256(_rootHash) & INPUT_MASK, _accountId, _owner, _tokenId, _amount));
 
         uint256[] memory inputs = new uint256[](1);
         inputs[0] = uint256(commitment) & INPUT_MASK;
