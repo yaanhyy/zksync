@@ -595,4 +595,27 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         );
         Ok(())
     }
+
+    pub async fn get_aggregated_op_that_affects_proof(
+        &mut self,
+        aggregated_action: AggregatedActionType,
+        block_number: BlockNumber,
+    ) -> QueryResult<Option<(i64, Value)>> {
+        let aggregated_op = sqlx::query_as!(
+            StoredAggregatedOperation,
+            "SELECT * FROM t_aggregate_operations WHERE f_action_type = ? and f_from_block <= ? and ? <= f_to_block",
+            aggregated_action.to_string(),
+            i64::from(block_number),
+            i64::from(block_number)
+        )
+            .fetch_optional(self.0.conn())
+            .await?
+            .map(|op| {
+                (
+                    op.f_id,
+                    serde_json::from_value(op.f_arguments).expect("unparsable aggregated op"),
+                )
+            });
+        Ok(aggregated_op)
+    }
 }

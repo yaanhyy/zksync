@@ -319,7 +319,8 @@ mod signatures_with_vectors {
                     )
                     .await
                     .expect("Change pub key signing error");
-
+                let res = serde_json::to_string(&change_pub_key).unwrap();
+                println!("res:{:?}", res);
                 assert_eq!(change_pub_key.get_bytes(), outputs.sign_bytes);
                 assert_tx_signature(
                     &change_pub_key.signature,
