@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 use zksync_storage::ConnectionPool;
 use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
+use num::bigint::ToBigInt;
 
 pub mod coingecko;
 pub mod coinmarkercap;
@@ -232,38 +233,44 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             return Ok(cached_value);
         }
 
-        let api_price = self.token_price_api.get_price(&token.symbol).await;
+        // let api_price = self.token_price_api.get_price(&token.symbol).await;
+        //
+        // match api_price {
+        //     Ok(api_price) => {
+        //         self.update_stored_value(token.id, api_price.clone(), false)
+        //             .await;
+        //         metrics::histogram!("ticker.get_last_quote", start.elapsed());
+        //         return Ok(api_price);
+        //     }
+        //     // Database contain this token, but it not listed in CoinGecko(CoinMarketCap)
+        //     Err(PriceError::TokenNotFound(_)) => {
+        //         return Ok(TokenPrice {
+        //             usd_price: Ratio::from_integer(0u32.into()),
+        //             last_updated: Utc::now(),
+        //         });
+        //     }
+        //     Err(e) => {
+        //         vlog::warn!("Failed to get price: {}", e);
+        //     }
+        // }
 
-        match api_price {
-            Ok(api_price) => {
-                self.update_stored_value(token.id, api_price.clone(), false)
-                    .await;
-                metrics::histogram!("ticker.get_last_quote", start.elapsed());
-                return Ok(api_price);
+        return Ok(
+            TokenPrice{
+                usd_price:Ratio::from_integer(BigUint::from(0 as u32)),
+                last_updated:Utc::now()
             }
-            // Database contain this token, but it not listed in CoinGecko(CoinMarketCap)
-            Err(PriceError::TokenNotFound(_)) => {
-                return Ok(TokenPrice {
-                    usd_price: Ratio::from_integer(0u32.into()),
-                    last_updated: Utc::now(),
-                });
-            }
-            Err(e) => {
-                vlog::warn!("Failed to get price: {}", e);
-            }
-        }
-
-        let historical_price = self
-            .get_historical_ticker_price(token.id)
-            .await
-            .map_err(|e| vlog::warn!("Failed to get historical ticker price: {}", e));
-
-        if let Ok(Some(historical_price)) = historical_price {
-            self.update_stored_value(token.id, historical_price.clone(), true)
-                .await;
-            metrics::histogram!("ticker.get_last_quote", start.elapsed());
-            return Ok(historical_price);
-        }
+        );
+        // let historical_price = self
+        //     .get_historical_ticker_price(token.id)
+        //     .await
+        //     .map_err(|e| vlog::warn!("Failed to get historical ticker price: {}", e));
+        //
+        // if let Ok(Some(historical_price)) = historical_price {
+        //     self.update_stored_value(token.id, historical_price.clone(), true)
+        //         .await;
+        //     metrics::histogram!("ticker.get_last_quote", start.elapsed());
+        //     return Ok(historical_price);
+        // }
 
         Err(PriceError::api_error(
             "Token price api is not available right now.",

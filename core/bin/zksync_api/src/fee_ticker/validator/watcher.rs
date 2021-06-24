@@ -36,39 +36,40 @@ impl UniswapTokenWatcher {
         // TODO https://linear.app/matterlabs/issue/ZKS-413/support-full-version-of-graphql-for-tokenvalidator
         let start = Instant::now();
 
-        let query = format!("{{token(id: \"{:#x}\"){{untrackedVolumeUSD}}}}", address);
-
-        let raw_response = self
-            .client
-            .post(&self.addr)
-            .json(&serde_json::json!({
-                "query": query.clone(),
-            }))
-            .timeout(REQUEST_TIMEOUT)
-            .send()
-            .await
-            .map_err(|err| anyhow::format_err!("Uniswap API request failed: {}", err))?;
-
-        let response_status = raw_response.status();
-        let response_text = raw_response.text().await?;
-
-        let response: GraphqlResponse = serde_json::from_str(&response_text).map_err(|err| {
-            anyhow::format_err!(
-                "Error: {} while decoding response: {} with status: {}",
-                err,
-                response_text,
-                response_status
-            )
-        })?;
-
-        metrics::histogram!("ticker.uniswap_watcher.get_market_volume", start.elapsed());
-
-        let volume = if let Some(token) = response.data.token {
-            token.untracked_volume_usd.parse()?
-        } else {
-            BigDecimal::zero()
-        };
-        Ok(volume)
+        // let query = format!("{{token(id: \"{:#x}\"){{untrackedVolumeUSD}}}}", address);
+        //
+        // let raw_response = self
+        //     .client
+        //     .post(&self.addr)
+        //     .json(&serde_json::json!({
+        //         "query": query.clone(),
+        //     }))
+        //     .timeout(REQUEST_TIMEOUT)
+        //     .send()
+        //     .await
+        //     .map_err(|err| anyhow::format_err!("Uniswap API request failed: {}", err))?;
+        //
+        // let response_status = raw_response.status();
+        // let response_text = raw_response.text().await?;
+        //
+        // let response: GraphqlResponse = serde_json::from_str(&response_text).map_err(|err| {
+        //     anyhow::format_err!(
+        //         "Error: {} while decoding response: {} with status: {}",
+        //         err,
+        //         response_text,
+        //         response_status
+        //     )
+        // })?;
+        //
+        // metrics::histogram!("ticker.uniswap_watcher.get_market_volume", start.elapsed());
+        //
+        // let volume = if let Some(token) = response.data.token {
+        //     token.untracked_volume_usd.parse()?
+        // } else {
+        //     BigDecimal::zero()
+        // };
+        // Ok(volume)
+        Ok(BigDecimal::zero())
     }
     async fn update_historical_amount(&mut self, address: Address, amount: BigDecimal) {
         let mut cache = self.cache.lock().await;

@@ -20,18 +20,18 @@ pub struct CoinGeckoAPI {
 
 impl CoinGeckoAPI {
     pub fn new(client: reqwest::Client, base_url: Url) -> anyhow::Result<Self> {
-        let token_list_url = base_url
-            .join("api/v3/coins/list")
-            .expect("failed to join URL path");
-
-        let token_list = reqwest::blocking::get(token_list_url)
-            .map_err(|err| anyhow::format_err!("CoinGecko API request failed: {}", err))?
-            .json::<CoinGeckoTokenList>()?;
+        // let token_list_url = base_url
+        //     .join("api/v3/coins/list")
+        //     .expect("failed to join URL path");
+        //
+        // let token_list = reqwest::blocking::get(token_list_url)
+        //     .map_err(|err| anyhow::format_err!("CoinGecko API request failed: {}", err))?
+        //     .json::<CoinGeckoTokenList>()?;
 
         let mut token_ids = HashMap::new();
-        for token in token_list.0 {
-            token_ids.insert(token.symbol, token.id);
-        }
+        // for token in token_list.0 {
+        //     token_ids.insert(token.symbol, token.id);
+        // }
         Ok(Self {
             base_url,
             client,

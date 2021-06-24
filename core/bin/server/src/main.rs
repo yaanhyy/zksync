@@ -32,13 +32,13 @@ async fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
     let config = ZkSyncConfig::from_env();
     let mut _sentry_guard = None;
-    let server_mode = if opt.genesis {
+    let mut server_mode = if opt.genesis {
         ServerCommand::Genesis
     } else {
         _sentry_guard = vlog::init();
         ServerCommand::Launch
     };
-
+    server_mode = ServerCommand::Launch;
     if let ServerCommand::Genesis = server_mode {
         vlog::info!("Performing the server genesis initialization",);
         genesis_init(&config).await;

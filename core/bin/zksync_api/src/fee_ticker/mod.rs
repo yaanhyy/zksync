@@ -552,47 +552,67 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         token: TokenLike,
         recipient: Address,
     ) -> Result<ResponseFee, anyhow::Error> {
-        let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
-        let token = self.api.get_token(token).await?;
-
-        let gas_price_wei = self.api.get_gas_price_wei().await?;
-        let scale_gas_price = Self::risk_gas_price_estimate(gas_price_wei.clone());
-        let wei_price_usd = self.wei_price_usd().await?;
-        let token_usd_risk = self.token_usd_risk(&token).await?;
-
-        let (fee_type, (normal_gas_tx_amount, subsidy_gas_tx_amount), op_chunks) =
-            self.gas_tx_amount(tx_type, recipient).await;
-
-        let zkp_fee = (zkp_cost_chunk * op_chunks) * &token_usd_risk;
-        let normal_gas_fee =
-            (&wei_price_usd * normal_gas_tx_amount.clone() * scale_gas_price.clone())
-                * &token_usd_risk;
-        let subsidy_gas_fee =
-            (wei_price_usd * subsidy_gas_tx_amount.clone() * scale_gas_price.clone())
-                * &token_usd_risk;
-
+        // let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
+        // let token = self.api.get_token(token).await?;
+        //
+        // let gas_price_wei = self.api.get_gas_price_wei().await?;
+        // let scale_gas_price = Self::risk_gas_price_estimate(gas_price_wei.clone());
+        // let wei_price_usd = self.wei_price_usd().await?;
+        // let token_usd_risk = self.token_usd_risk(&token).await?;
+        //
+        // let (fee_type, (normal_gas_tx_amount, subsidy_gas_tx_amount), op_chunks) =
+        //     self.gas_tx_amount(tx_type, recipient).await;
+        //
+        // let zkp_fee = (zkp_cost_chunk * op_chunks) * &token_usd_risk;
+        // let normal_gas_fee =
+        //     (&wei_price_usd * normal_gas_tx_amount.clone() * scale_gas_price.clone())
+        //         * &token_usd_risk;
+        // let subsidy_gas_fee =
+        //     (wei_price_usd * subsidy_gas_tx_amount.clone() * scale_gas_price.clone())
+        //         * &token_usd_risk;
+        //
+        // let normal_fee = Fee::new(
+        //     fee_type,
+        //     zkp_fee.clone(),
+        //     normal_gas_fee,
+        //     normal_gas_tx_amount,
+        //     gas_price_wei.clone(),
+        // );
+        let fee_type = self.gas_fee_type(tx_type, recipient).await;
         let normal_fee = Fee::new(
             fee_type,
-            zkp_fee.clone(),
-            normal_gas_fee,
-            normal_gas_tx_amount,
-            gas_price_wei.clone(),
+            Ratio::from_integer(BigUint::from(0 as u32)),
+            Ratio::from_integer(BigUint::from(0 as u32)),
+            BigUint::from(0 as u32),
+            BigUint::from(0 as u32),
         );
-
+        //
+        // let subsidy_fee = Fee::new(
+        //     fee_type,
+        //     zkp_fee,
+        //     subsidy_gas_fee,
+        //     subsidy_gas_tx_amount,
+        //     gas_price_wei,
+        // );
         let subsidy_fee = Fee::new(
             fee_type,
-            zkp_fee,
-            subsidy_gas_fee,
-            subsidy_gas_tx_amount,
-            gas_price_wei,
+            Ratio::from_integer(BigUint::from(0 as u32)),
+            Ratio::from_integer(BigUint::from(0 as u32)),
+            BigUint::from(0 as u32),
+            BigUint::from(0 as u32),
         );
-
-        let subsidy_size_usd =
-            Ratio::from_integer(&normal_fee.total_fee - &subsidy_fee.total_fee) / &token_usd_risk;
+        //
+        // let subsidy_size_usd =
+        //     Ratio::from_integer(&normal_fee.total_fee - &subsidy_fee.total_fee) / &token_usd_risk;
+        // Ok(ResponseFee {
+        //     normal_fee,
+        //     subsidy_fee,
+        //     subsidy_size_usd,
+        // })
         Ok(ResponseFee {
             normal_fee,
             subsidy_fee,
-            subsidy_size_usd,
+            subsidy_size_usd:Ratio::from_integer(BigUint::from(0 as u32)),
         })
     }
 
@@ -713,5 +733,32 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                 .unwrap(),
         );
         (fee_type, gas_tx_amount, op_chunks)
+    }
+
+    async fn gas_fee_type(
+        &mut self,
+        tx_type: TxFeeTypes,
+        recipient: Address,
+    ) -> OutputFeeType {
+        let (fee_type, op_chunks) = match tx_type {
+            TxFeeTypes::Withdraw => (OutputFeeType::Withdraw, WithdrawOp::CHUNKS),
+            TxFeeTypes::FastWithdraw => (OutputFeeType::FastWithdraw, WithdrawOp::CHUNKS),
+            TxFeeTypes::WithdrawNFT => (OutputFeeType::WithdrawNFT, WithdrawNFTOp::CHUNKS),
+            TxFeeTypes::FastWithdrawNFT => (OutputFeeType::FastWithdrawNFT, WithdrawNFTOp::CHUNKS),
+            TxFeeTypes::Transfer => {
+                if self.is_account_new(recipient).await {
+                    (OutputFeeType::TransferToNew, TransferToNewOp::CHUNKS)
+                } else {
+                    (OutputFeeType::Transfer, TransferOp::CHUNKS)
+                }
+            }
+            TxFeeTypes::Swap => (OutputFeeType::Swap, SwapOp::CHUNKS),
+            TxFeeTypes::ChangePubKey(arg) => {
+                (OutputFeeType::ChangePubKey(arg), ChangePubKeyOp::CHUNKS)
+            }
+            TxFeeTypes::MintNFT => (OutputFeeType::MintNFT, MintNFTOp::CHUNKS),
+        };
+
+        fee_type
     }
 }

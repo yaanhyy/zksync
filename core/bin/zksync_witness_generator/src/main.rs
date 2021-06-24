@@ -29,15 +29,15 @@ async fn main() -> anyhow::Result<()> {
     let zksync_config = ZkSyncConfig::from_env();
 
     // Run prometheus data exporter.
-    let (prometheus_task_handle, _) =
-        run_prometheus_exporter(connection_pool, zksync_config.api.prometheus.port, false);
+    // let (prometheus_task_handle, _) =
+    //     run_prometheus_exporter(connection_pool, zksync_config.api.prometheus.port, false);
 
     run_prover_server(database, stop_signal_sender, zksync_config);
 
     tokio::select! {
-        _ = async { prometheus_task_handle.await } => {
-            panic!("Prometheus exporter actors aren't supposed to finish their execution")
-        },
+        // _ = async { prometheus_task_handle.await } => {
+        //     panic!("Prometheus exporter actors aren't supposed to finish their execution")
+        // },
         _ = async { stop_signal_receiver.next().await } => {
             vlog::warn!("Stop signal received, shutting down");
         }
