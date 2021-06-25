@@ -43,6 +43,10 @@ use zksync::{
 };
 use zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
 use log::info;
+use parity_crypto::{
+    publickey::{public_to_address, recover, sign, KeyPair, Signature as ETHSignature},
+    Keccak256,
+};
 const ETH_ADDR: &str = "36615Cf349d7F6344891B1e7CA7C72883F5dc049";
 const ETH_PRIVATE_KEY: &str = "7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110";
 const LOCALHOST_WEB3_ADDR: &str = "http://127.0.0.1:8545";
@@ -65,7 +69,9 @@ fn eth_main_account_credentials() -> (H160, H256) {
 }
 
 fn eth_user_account_credentials(private_key: &str) -> (H160, H256) {
-    let eth_private_key = private_key.parse().unwrap();
+    let eth_private_key: H256 = private_key.parse().unwrap();
+    let pair = KeyPair::from_secret((eth_private_key).into()).unwrap();
+    info!("pub:{:?}", pair.public());
     let address_from_pk = PackedEthSignature::address_from_private_key(&eth_private_key).unwrap();
     info!{"user address:{:?}", address_from_pk};
     (address_from_pk, eth_private_key)

@@ -6153,6 +6153,7 @@ dependencies = [
  "jsonrpc-core",
  "log 0.4.11",
  "num",
+ "parity-crypto",
  "reqwest",
  "serde",
  "serde_json",
