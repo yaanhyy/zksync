@@ -3,21 +3,20 @@ import { BigNumber, ethers } from 'ethers';
 import {
     AccountState,
     Address,
-    ChangePubKeyFee,
+    IncomingTxFeeType,
     ContractAddress,
     Fee,
-    LegacyChangePubKeyFee,
     Network,
-    NFT,
     PriorityOperationReceipt,
     TokenAddress,
     TokenLike,
     Tokens,
     TransactionReceipt,
     TxEthSignature,
-    TxEthSignatureVariant
+    TxEthSignatureVariant,
+    NFTInfo
 } from './types';
-import { isTokenETH, sleep, TokenSet, isNFT } from './utils';
+import { isTokenETH, sleep, TokenSet } from './utils';
 import {
     Governance,
     GovernanceFactory,
@@ -26,6 +25,8 @@ import {
     ZkSyncNFTFactory,
     ZkSyncNFTFactoryFactory
 } from './typechain';
+
+import { SyncProvider } from './provider-interface';
 
 export async function getDefaultProvider(network: Network, transport: 'WS' | 'HTTP' = 'HTTP'): Promise<Provider> {
     if (transport === 'WS') {
@@ -72,14 +73,11 @@ export async function getDefaultProvider(network: Network, transport: 'WS' | 'HT
     }
 }
 
-export class Provider {
-    contractAddress: ContractAddress;
-    public tokenSet: TokenSet;
-
-    // For HTTP provider
-    public pollIntervalMilliSecs = 500;
-
-    private constructor(public transport: AbstractJSONRPCTransport) {}
+export class Provider extends SyncProvider {
+    private constructor(public transport: AbstractJSONRPCTransport) {
+        super();
+        this.providerType = 'RPC';
+    }
 
     /**
      * @deprecated Websocket support will be removed in future. Use HTTP transport instead.
@@ -87,8 +85,9 @@ export class Provider {
     static async newWebsocketProvider(address: string): Promise<Provider> {
         const transport = await WSTransport.connect(address);
         const provider = new Provider(transport);
-        provider.contractAddress = await provider.getContractAddress();
-        provider.tokenSet = new TokenSet(await provider.getTokens());
+        const contractsAndTokens = await Promise.all([provider.getContractAddress(), provider.getTokens()]);
+        provider.contractAddress = contractsAndTokens[0];
+        provider.tokenSet = new TokenSet(contractsAndTokens[1]);
         return provider;
     }
 
@@ -101,8 +100,9 @@ export class Provider {
         if (pollIntervalMilliSecs) {
             provider.pollIntervalMilliSecs = pollIntervalMilliSecs;
         }
-        provider.contractAddress = await provider.getContractAddress();
-        provider.tokenSet = new TokenSet(await provider.getTokens());
+        const contractsAndTokens = await Promise.all([provider.getContractAddress(), provider.getTokens()]);
+        provider.contractAddress = contractsAndTokens[0];
+        provider.tokenSet = new TokenSet(contractsAndTokens[1]);
         return provider;
     }
 
@@ -114,8 +114,9 @@ export class Provider {
         const transport = new DummyTransport(network, ethPrivateKey, getTokens);
         const provider = new Provider(transport);
 
-        provider.contractAddress = await provider.getContractAddress();
-        provider.tokenSet = new TokenSet(await provider.getTokens());
+        const contractsAndTokens = await Promise.all([provider.getContractAddress(), provider.getTokens()]);
+        provider.contractAddress = contractsAndTokens[0];
+        provider.tokenSet = new TokenSet(contractsAndTokens[1]);
         return provider;
     }
 
@@ -151,11 +152,6 @@ export class Provider {
         return await this.transport.request('tokens', null);
     }
 
-    async updateTokenSet(): Promise<void> {
-        const updatedTokenSet = new TokenSet(await this.getTokens());
-        this.tokenSet = updatedTokenSet;
-    }
-
     async getState(address: Address): Promise<AccountState> {
         return await this.transport.request('account_info', [address]);
     }
@@ -177,16 +173,15 @@ export class Provider {
         return await this.transport.request('get_eth_tx_for_withdrawal', [withdrawal_hash]);
     }
 
-    async getNFT(id: number): Promise<NFT> {
-        return await this.transport.request('get_nft', [id]);
-    }
+    async getNFT(id: number): Promise<NFTInfo> {
+        const nft = await this.transport.request('get_nft', [id]);
 
-    async getTokenSymbol(token: TokenLike): Promise<string> {
-        if (isNFT(token)) {
-            const nft = await this.getNFT(token as number);
-            return nft.symbol || `NFT-${token}`;
+        // If the NFT does not exist, throw an exception
+        if (nft == null) {
+            throw new Error(`Requested NFT doesn't exist or the corresponding mintNFT operation is not verified yet`);
         }
-        return this.tokenSet.resolveTokenSymbol(token);
+
+        return nft;
     }
 
     async notifyPriorityOp(serialId: number, action: 'COMMIT' | 'VERIFY'): Promise<PriorityOperationReceipt> {
@@ -246,20 +241,7 @@ export class Provider {
         }
     }
 
-    async getTransactionFee(
-        txType:
-            | 'Withdraw'
-            | 'Transfer'
-            | 'FastWithdraw'
-            | 'MintNFT'
-            | 'Swap'
-            | ChangePubKeyFee
-            | 'WithdrawNFT'
-            | 'FastWithdrawNFT'
-            | LegacyChangePubKeyFee,
-        address: Address,
-        tokenLike: TokenLike
-    ): Promise<Fee> {
+    async getTransactionFee(txType: IncomingTxFeeType, address: Address, tokenLike: TokenLike): Promise<Fee> {
         const transactionFee = await this.transport.request('get_tx_fee', [txType, address.toString(), tokenLike]);
         return {
             feeType: transactionFee.feeType,
@@ -272,17 +254,7 @@ export class Provider {
     }
 
     async getTransactionsBatchFee(
-        txTypes: (
-            | 'Withdraw'
-            | 'Transfer'
-            | 'FastWithdraw'
-            | 'MintNFT'
-            | 'WithdrawNFT'
-            | 'FastWithdrawNFT'
-            | ChangePubKeyFee
-            | LegacyChangePubKeyFee
-            | 'Swap'
-        )[],
+        txTypes: IncomingTxFeeType[],
         addresses: Address[],
         tokenLike: TokenLike
     ): Promise<BigNumber> {

@@ -7,6 +7,7 @@ pub fn create_full_exit_op() -> ExecutedOperations {
         account_id: AccountId(0),
         eth_address: Address::zero(),
         token: TokenId(0),
+        is_legacy: false,
     };
     ExecutedOperations::PriorityOp(Box::new(ExecutedPriorityOp {
         priority_op: PriorityOp {
@@ -15,6 +16,7 @@ pub fn create_full_exit_op() -> ExecutedOperations {
             deadline_block: 0,
             eth_hash: H256::zero(),
             eth_block: 0,
+            eth_block_index: None,
         },
         op: ZkSyncOp::FullExit(Box::new(FullExitOp {
             priority_op,

@@ -6,7 +6,7 @@ use zksync_types::{
     aggregated_operations::{
         AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksExecuteOperation,
     },
-    AccountId, AccountUpdate, BlockNumber, Token,
+    AccountId, AccountUpdate, BlockNumber, Token, ZkSyncOp,
 };
 // Local imports
 use self::records::{
@@ -112,7 +112,10 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
                 GROUP BY block_num
             ) ops
                 ON blocks.block_num = ops.block_num
-            JOIN data_restore_events_state as events
+            JOIN (
+                SELECT DISTINCT block_num, contract_version
+                FROM data_restore_events_state
+            ) events
                 ON blocks.block_num = events.block_num
             ORDER BY blocks.block_num ASC"
         )
@@ -239,7 +242,16 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             let operations: Vec<_> = block
                 .ops
                 .iter()
-                .map(|op| serde_json::to_value(op.clone()).unwrap())
+                .map(|op| {
+                    let mut value = serde_json::to_value(op.clone()).unwrap();
+                    if let ZkSyncOp::FullExit(full_exit) = op {
+                        // In general, this field is not expected to be serialized,
+                        // however it is used in data_restore to determine the number of
+                        // required chunks
+                        value["priority_op"]["is_legacy"] = full_exit.priority_op.is_legacy.into();
+                    }
+                    value
+                })
                 .collect();
             sqlx::query!(
                 "INSERT INTO data_restore_rollup_block_ops (block_num, operation)

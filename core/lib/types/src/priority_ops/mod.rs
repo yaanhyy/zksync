@@ -2,6 +2,7 @@
 
 use ethabi::{decode, ParamType};
 use num::{BigUint, ToPrimitive};
+use parity_crypto::digest::sha256;
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use zksync_basic_types::{Address, Log, H256, U256};
@@ -13,6 +14,7 @@ use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use super::{
     operations::{DepositOp, FullExitOp},
+    tx::TxHash,
     utils::h256_as_vec,
     AccountId, SerialId, TokenId,
 };
@@ -46,6 +48,12 @@ pub struct FullExit {
     pub account_id: AccountId,
     pub eth_address: Address,
     pub token: TokenId,
+    /// A flag that indicates whether the operation was performed
+    /// before the NFT upgrade with an old number of required block chunks.
+    /// Only serialized manually by the `data_restore`, `false` by default.
+    #[serde(default)]
+    #[serde(skip_serializing)]
+    pub is_legacy: bool,
 }
 
 /// A set of L1 priority operations supported by the zkSync network.
@@ -177,6 +185,7 @@ impl ZkSyncPriorityOp {
                     account_id: AccountId(account_id),
                     eth_address,
                     token: TokenId(token as u32),
+                    is_legacy: false,
                 }))
             }
             _ => Err(LogParseError::UnsupportedPriorityOpType),
@@ -298,6 +307,7 @@ impl ZkSyncPriorityOp {
                     account_id: AccountId(account_id),
                     eth_address,
                     token: TokenId(token),
+                    is_legacy: false,
                 }))
             }
             _ => Err(LogParseError::UnsupportedPriorityOpType),
@@ -349,6 +359,9 @@ pub struct PriorityOp {
     pub eth_hash: H256,
     /// Block in which Ethereum transaction was included.
     pub eth_block: u64,
+    /// Transaction index in Ethereum block.
+    /// This field must be optional because of backward compatibility.
+    pub eth_block_index: Option<u64>,
 }
 
 impl TryFrom<Log> for PriorityOp {
@@ -408,6 +421,7 @@ impl TryFrom<Log> for PriorityOp {
                 .block_number
                 .expect("Event block number is missing")
                 .as_u64(),
+            eth_block_index: event.transaction_index.map(|index| index.as_u64()),
         })
     }
 }
@@ -417,5 +431,17 @@ impl PriorityOp {
         ZkSyncPriorityOp::get_args_for_priority_queue_cancel(
             queue_entries.iter().map(|priority_op| &priority_op.data),
         )
+    }
+
+    pub fn tx_hash(&self) -> TxHash {
+        let mut bytes = Vec::with_capacity(48);
+        bytes.extend_from_slice(self.eth_hash.as_bytes());
+        bytes.extend_from_slice(&self.eth_block.to_be_bytes());
+        bytes.extend_from_slice(&self.eth_block_index.unwrap_or(0).to_be_bytes());
+
+        let hash = sha256(&bytes);
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&hash);
+        TxHash { data: out }
     }
 }

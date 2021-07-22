@@ -1,5 +1,5 @@
 import { utils, constants, ethers, BigNumber, BigNumberish, Contract } from 'ethers';
-import { Provider } from '.';
+import { SyncProvider } from './provider-interface';
 import {
     PubKeyHash,
     TokenAddress,
@@ -385,7 +385,11 @@ export class TokenSet {
 
     public formatToken(tokenLike: TokenOrId, amount: BigNumberish): string {
         const decimals = this.resolveTokenDecimals(tokenLike);
-        return utils.formatUnits(amount, decimals);
+        const value = utils.formatUnits(amount, decimals);
+
+        // We need to add this check to support broader versions of ethers
+        // since the `formatUnits` function behaves differently within ^5.0.0 versions
+        return value.includes('.') ? value : value + '.0';
     }
 
     public parseToken(tokenLike: TokenOrId, amount: string): BigNumber {
@@ -802,9 +806,9 @@ export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
  * Encodes the transaction data as the byte sequence according to the zkSync protocol.
  * @param tx A transaction to serialize.
  */
-export function serializeTx(
-    tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit | MintNFT | WithdrawNFT
-): Uint8Array {
+export async function serializeTx(
+    tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit | MintNFT | WithdrawNFT | Swap
+): Promise<Uint8Array> {
     switch (tx.type) {
         case 'Transfer':
             return serializeTransfer(tx);
@@ -818,6 +822,9 @@ export function serializeTx(
             return serializeMintNFT(tx);
         case 'WithdrawNFT':
             return serializeWithdrawNFT(tx);
+        case 'Swap':
+            // this returns a promise
+            return serializeSwap(tx);
         default:
             return new Uint8Array();
     }
@@ -873,7 +880,7 @@ export function getCREATE2AddressAndSalt(
 
 export async function getEthereumBalance(
     ethProvider: ethers.providers.Provider,
-    syncProvider: Provider,
+    syncProvider: SyncProvider,
     address: Address,
     token: TokenLike
 ): Promise<BigNumber> {
@@ -894,7 +901,7 @@ export async function getEthereumBalance(
 
 export async function getPendingBalance(
     ethProvider: ethers.providers.Provider,
-    syncProvider: Provider,
+    syncProvider: SyncProvider,
     address: Address,
     token: TokenLike
 ): Promise<BigNumberish> {
@@ -909,10 +916,12 @@ export async function getPendingBalance(
     return zksyncContract.getPendingBalance(address, tokenAddress);
 }
 
-export function getTxHash(tx: Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccount): string {
+export async function getTxHash(
+    tx: Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccount | Swap | MintNFT | WithdrawNFT
+): Promise<string> {
     if (tx.type == 'Close') {
         throw new Error('Close operation is disabled');
     }
-    let txBytes = serializeTx(tx);
+    let txBytes = await serializeTx(tx);
     return ethers.utils.sha256(txBytes).replace('0x', 'sync-tx:');
 }

@@ -16,10 +16,9 @@ use futures::{
     StreamExt,
 };
 use num::{
-    bigint::ToBigInt,
     rational::Ratio,
     traits::{Inv, Pow},
-    BigUint, CheckedDiv, CheckedSub, Zero,
+    BigUint, CheckedDiv, Zero,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -65,7 +64,6 @@ static TICKER_CHANNEL_SIZE: usize = 32000;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GasOperationsCost {
     standard_cost: HashMap<OutputFeeType, BigUint>,
-    subsidize_cost: HashMap<OutputFeeType, BigUint>,
 }
 
 impl GasOperationsCost {
@@ -74,12 +72,8 @@ impl GasOperationsCost {
         // size, resulting in us paying more gas than for bigger block.
         let standard_fast_withdrawal_cost =
             (constants::BASE_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
-        let subsidy_fast_withdrawal_cost =
-            (constants::SUBSIDY_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
         let standard_fast_withdrawal_nft_cost =
             (constants::BASE_WITHDRAW_NFT_COST as f64 * fast_processing_coeff) as u32;
-        let subsidy_fast_withdrawal_nft_cost =
-            (constants::SUBSIDY_WITHDRAW_NFT_COST as f64 * fast_processing_coeff) as u32;
 
         let standard_cost = vec![
             (
@@ -143,74 +137,7 @@ impl GasOperationsCost {
         .into_iter()
         .collect::<HashMap<_, _>>();
 
-        let subsidize_cost = vec![
-            (
-                OutputFeeType::Transfer,
-                constants::SUBSIDY_TRANSFER_COST.into(),
-            ),
-            (
-                OutputFeeType::TransferToNew,
-                constants::SUBSIDY_TRANSFER_TO_NEW_COST.into(),
-            ),
-            (
-                OutputFeeType::Withdraw,
-                constants::SUBSIDY_WITHDRAW_COST.into(),
-            ),
-            (
-                OutputFeeType::FastWithdraw,
-                subsidy_fast_withdrawal_cost.into(),
-            ),
-            (OutputFeeType::Swap, constants::SUBSIDY_SWAP_COST.into()),
-            (
-                OutputFeeType::WithdrawNFT,
-                constants::SUBSIDY_WITHDRAW_NFT_COST.into(),
-            ),
-            (
-                OutputFeeType::FastWithdrawNFT,
-                subsidy_fast_withdrawal_nft_cost.into(),
-            ),
-            (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
-                    onchain_pubkey_auth: false,
-                }),
-                constants::SUBSIDY_OLD_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
-            ),
-            (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
-                    onchain_pubkey_auth: true,
-                }),
-                constants::SUBSIDY_CHANGE_PUBKEY_ONCHAIN_COST.into(),
-            ),
-            (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                    ChangePubKeyType::Onchain,
-                )),
-                constants::SUBSIDY_CHANGE_PUBKEY_ONCHAIN_COST.into(),
-            ),
-            (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                    ChangePubKeyType::ECDSA,
-                )),
-                constants::SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
-            ),
-            (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                    ChangePubKeyType::CREATE2,
-                )),
-                constants::SUBSIDY_CHANGE_PUBKEY_CREATE2_COST.into(),
-            ),
-            (
-                OutputFeeType::MintNFT,
-                constants::SUBSIDY_MINT_NFT_COST.into(),
-            ),
-        ]
-        .into_iter()
-        .collect::<HashMap<_, _>>();
-
-        Self {
-            standard_cost,
-            subsidize_cost,
-        }
+        Self { standard_cost }
     }
 }
 
@@ -219,7 +146,7 @@ pub struct TickerConfig {
     zkp_cost_chunk_usd: Ratio<BigUint>,
     gas_cost_tx: GasOperationsCost,
     tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
-    not_subsidized_tokens: HashSet<Address>,
+    scale_fee_coefficient: Ratio<BigUint>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -231,65 +158,11 @@ pub enum TokenPriceRequestType {
 #[derive(Debug)]
 pub struct ResponseFee {
     pub normal_fee: Fee,
-    pub subsidy_fee: Fee,
-    pub subsidy_size_usd: Ratio<BigUint>,
-}
-
-fn get_max_subsidy(
-    max_subsidy_usd: &Ratio<BigUint>,
-    subsidy_usd: &Ratio<BigUint>,
-    normal_fee_token: &BigUint,
-    subsidy_fee_token: &BigUint,
-) -> BigDecimal {
-    if max_subsidy_usd > subsidy_usd {
-        let subsidy_uint = normal_fee_token
-            .checked_sub(subsidy_fee_token)
-            .unwrap_or_else(|| {
-                vlog::error!(
-                    "Subisdy fee is bigger then normal fee, subsidy: {:?}, noraml_fee: {:?}",
-                    subsidy_fee_token,
-                    normal_fee_token
-                );
-                0u32.into()
-            });
-
-        BigDecimal::from(
-            subsidy_uint
-                .to_bigint()
-                .expect("biguint should convert to bigint"),
-        )
-    } else {
-        BigDecimal::from(0)
-    }
-}
-
-impl ResponseFee {
-    pub fn get_max_subsidy(&self, allowed_subsidy: &Ratio<BigUint>) -> BigDecimal {
-        get_max_subsidy(
-            allowed_subsidy,
-            &self.subsidy_size_usd,
-            &self.normal_fee.total_fee,
-            &self.subsidy_fee.total_fee,
-        )
-    }
 }
 
 #[derive(Debug)]
 pub struct ResponseBatchFee {
     pub normal_fee: BatchFee,
-    pub subsidy_fee: BatchFee,
-    pub subsidy_size_usd: Ratio<BigUint>,
-}
-
-impl ResponseBatchFee {
-    pub fn get_max_subsidy(&self, allowed_subsidy: &Ratio<BigUint>) -> BigDecimal {
-        get_max_subsidy(
-            allowed_subsidy,
-            &self.subsidy_size_usd,
-            &self.normal_fee.total_fee,
-            &self.subsidy_fee.total_fee,
-        )
-    }
 }
 
 #[derive(Debug)]
@@ -383,7 +256,10 @@ pub fn run_ticker_task(
         zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
         gas_cost_tx: GasOperationsCost::from_constants(config.ticker.fast_processing_coeff),
         tokens_risk_factors: HashMap::new(),
-        not_subsidized_tokens: HashSet::from_iter(config.ticker.not_subsidized_tokens.clone()),
+        scale_fee_coefficient: Ratio::new(
+            BigUint::from(config.ticker.scale_fee_percent),
+            BigUint::from(100u32),
+        ),
     };
 
     let cache = (db_pool.clone(), TokenDBCache::new());
@@ -552,68 +428,30 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         token: TokenLike,
         recipient: Address,
     ) -> Result<ResponseFee, anyhow::Error> {
-        // let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
-        // let token = self.api.get_token(token).await?;
-        //
-        // let gas_price_wei = self.api.get_gas_price_wei().await?;
-        // let scale_gas_price = Self::risk_gas_price_estimate(gas_price_wei.clone());
-        // let wei_price_usd = self.wei_price_usd().await?;
-        // let token_usd_risk = self.token_usd_risk(&token).await?;
-        //
-        // let (fee_type, (normal_gas_tx_amount, subsidy_gas_tx_amount), op_chunks) =
-        //     self.gas_tx_amount(tx_type, recipient).await;
-        //
-        // let zkp_fee = (zkp_cost_chunk * op_chunks) * &token_usd_risk;
-        // let normal_gas_fee =
-        //     (&wei_price_usd * normal_gas_tx_amount.clone() * scale_gas_price.clone())
-        //         * &token_usd_risk;
-        // let subsidy_gas_fee =
-        //     (wei_price_usd * subsidy_gas_tx_amount.clone() * scale_gas_price.clone())
-        //         * &token_usd_risk;
-        //
-        // let normal_fee = Fee::new(
-        //     fee_type,
-        //     zkp_fee.clone(),
-        //     normal_gas_fee,
-        //     normal_gas_tx_amount,
-        //     gas_price_wei.clone(),
-        // );
-        let fee_type = self.gas_fee_type(tx_type, recipient).await;
+        let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
+        let token = self.api.get_token(token).await?;
+
+        let gas_price_wei = self.api.get_gas_price_wei().await?;
+        let scale_gas_price = Self::risk_gas_price_estimate(gas_price_wei.clone());
+        let wei_price_usd = self.wei_price_usd().await?;
+        let token_usd_risk = self.token_usd_risk(&token).await?;
+
+        let (fee_type, gas_tx_amount, op_chunks) = self.gas_tx_amount(tx_type, recipient).await;
+
+        let zkp_fee = (zkp_cost_chunk * op_chunks) * &token_usd_risk;
+        let normal_gas_fee = (&wei_price_usd * gas_tx_amount.clone() * scale_gas_price.clone())
+            * self.config.scale_fee_coefficient.clone()
+            * &token_usd_risk;
+
         let normal_fee = Fee::new(
             fee_type,
-            Ratio::from_integer(BigUint::from(0 as u32)),
-            Ratio::from_integer(BigUint::from(0 as u32)),
-            BigUint::from(0 as u32),
-            BigUint::from(0 as u32),
+            zkp_fee,
+            normal_gas_fee,
+            gas_tx_amount,
+            gas_price_wei.clone(),
         );
-        //
-        // let subsidy_fee = Fee::new(
-        //     fee_type,
-        //     zkp_fee,
-        //     subsidy_gas_fee,
-        //     subsidy_gas_tx_amount,
-        //     gas_price_wei,
-        // );
-        let subsidy_fee = Fee::new(
-            fee_type,
-            Ratio::from_integer(BigUint::from(0 as u32)),
-            Ratio::from_integer(BigUint::from(0 as u32)),
-            BigUint::from(0 as u32),
-            BigUint::from(0 as u32),
-        );
-        //
-        // let subsidy_size_usd =
-        //     Ratio::from_integer(&normal_fee.total_fee - &subsidy_fee.total_fee) / &token_usd_risk;
-        // Ok(ResponseFee {
-        //     normal_fee,
-        //     subsidy_fee,
-        //     subsidy_size_usd,
-        // })
-        Ok(ResponseFee {
-            normal_fee,
-            subsidy_fee,
-            subsidy_size_usd:Ratio::from_integer(BigUint::from(0 as u32)),
-        })
+
+        Ok(ResponseFee { normal_fee })
     }
 
     async fn get_batch_from_ticker_in_wei(
@@ -630,32 +468,21 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let token_usd_risk = self.token_usd_risk(&token).await?;
 
         let mut total_normal_gas_tx_amount = BigUint::zero();
-        let mut total_subsidy_gas_tx_amount = BigUint::zero();
         let mut total_op_chunks = BigUint::zero();
 
         for (tx_type, recipient) in txs {
-            let (_, (normal_gas_tx_amount, subsidy_gas_tx_amount), op_chunks) =
-                self.gas_tx_amount(tx_type, recipient).await;
-            total_normal_gas_tx_amount += normal_gas_tx_amount;
-            total_subsidy_gas_tx_amount += subsidy_gas_tx_amount;
+            let (_, gas_tx_amount, op_chunks) = self.gas_tx_amount(tx_type, recipient).await;
+            total_normal_gas_tx_amount += gas_tx_amount;
             total_op_chunks += op_chunks;
         }
 
         let total_zkp_fee = (zkp_cost_chunk * total_op_chunks) * token_usd_risk.clone();
-        let total_normal_gas_fee =
-            (&wei_price_usd * total_normal_gas_tx_amount * &scale_gas_price) * &token_usd_risk;
-        let total_subsidy_gas_fee =
-            (wei_price_usd * total_subsidy_gas_tx_amount * scale_gas_price) * &token_usd_risk;
-        let normal_fee = BatchFee::new(&total_zkp_fee, &total_normal_gas_fee);
-        let subsidy_fee = BatchFee::new(&total_zkp_fee, &total_subsidy_gas_fee);
+        let total_normal_gas_fee = (&wei_price_usd * total_normal_gas_tx_amount * &scale_gas_price)
+            * &token_usd_risk
+            * self.config.scale_fee_coefficient.clone();
+        let normal_fee = BatchFee::new(total_zkp_fee, total_normal_gas_fee);
 
-        let subsidy_size_usd =
-            Ratio::from_integer(&normal_fee.total_fee - &subsidy_fee.total_fee) / &token_usd_risk;
-        Ok(ResponseBatchFee {
-            normal_fee,
-            subsidy_fee,
-            subsidy_size_usd,
-        })
+        Ok(ResponseBatchFee { normal_fee })
     }
 
     async fn wei_price_usd(&mut self) -> anyhow::Result<Ratio<BigUint>> {
@@ -696,7 +523,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         &mut self,
         tx_type: TxFeeTypes,
         recipient: Address,
-    ) -> (OutputFeeType, (BigUint, BigUint), BigUint) {
+    ) -> (OutputFeeType, BigUint, BigUint) {
         let (fee_type, op_chunks) = match tx_type {
             TxFeeTypes::Withdraw => (OutputFeeType::Withdraw, WithdrawOp::CHUNKS),
             TxFeeTypes::FastWithdraw => (OutputFeeType::FastWithdraw, WithdrawOp::CHUNKS),
@@ -718,47 +545,14 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
 
-        let gas_tx_amount = (
-            self.config
-                .gas_cost_tx
-                .standard_cost
-                .get(&fee_type)
-                .cloned()
-                .unwrap(),
-            self.config
-                .gas_cost_tx
-                .subsidize_cost
-                .get(&fee_type)
-                .cloned()
-                .unwrap(),
-        );
+        let gas_tx_amount = self
+            .config
+            .gas_cost_tx
+            .standard_cost
+            .get(&fee_type)
+            .cloned()
+            .unwrap();
+
         (fee_type, gas_tx_amount, op_chunks)
-    }
-
-    async fn gas_fee_type(
-        &mut self,
-        tx_type: TxFeeTypes,
-        recipient: Address,
-    ) -> OutputFeeType {
-        let (fee_type, op_chunks) = match tx_type {
-            TxFeeTypes::Withdraw => (OutputFeeType::Withdraw, WithdrawOp::CHUNKS),
-            TxFeeTypes::FastWithdraw => (OutputFeeType::FastWithdraw, WithdrawOp::CHUNKS),
-            TxFeeTypes::WithdrawNFT => (OutputFeeType::WithdrawNFT, WithdrawNFTOp::CHUNKS),
-            TxFeeTypes::FastWithdrawNFT => (OutputFeeType::FastWithdrawNFT, WithdrawNFTOp::CHUNKS),
-            TxFeeTypes::Transfer => {
-                if self.is_account_new(recipient).await {
-                    (OutputFeeType::TransferToNew, TransferToNewOp::CHUNKS)
-                } else {
-                    (OutputFeeType::Transfer, TransferOp::CHUNKS)
-                }
-            }
-            TxFeeTypes::Swap => (OutputFeeType::Swap, SwapOp::CHUNKS),
-            TxFeeTypes::ChangePubKey(arg) => {
-                (OutputFeeType::ChangePubKey(arg), ChangePubKeyOp::CHUNKS)
-            }
-            TxFeeTypes::MintNFT => (OutputFeeType::MintNFT, MintNFTOp::CHUNKS),
-        };
-
-        fee_type
     }
 }

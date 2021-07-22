@@ -89,20 +89,14 @@ impl TestToken {
         Self::new(TokenId(4), 0.0, Some(0.9), 18, Address::default())
     }
 
-    fn subsidized_tokens() -> Vec<Self> {
-        vec![Self::eth(), Self::cheap(), Self::expensive()]
-    }
-
-    fn unsubsidized_tokens() -> Vec<Self> {
-        vec![Self::hex(), Self::zero_price()]
-    }
-
     fn all_tokens() -> Vec<Self> {
-        let mut all_tokens = Vec::new();
-        all_tokens.extend_from_slice(&Self::subsidized_tokens());
-        all_tokens.extend_from_slice(&Self::unsubsidized_tokens());
-
-        all_tokens
+        vec![
+            Self::eth(),
+            Self::cheap(),
+            Self::expensive(),
+            Self::hex(),
+            Self::zero_price(),
+        ]
     }
 }
 
@@ -118,11 +112,7 @@ fn get_test_ticker_config() -> TickerConfig {
                 t.risk_factor.map(|risk| (id, risk))
             })
             .collect(),
-        not_subsidized_tokens: vec![
-            Address::from_str("34083bbd70d394110487feaa087da875a54624ec").unwrap(),
-        ]
-        .into_iter()
-        .collect(),
+        scale_fee_coefficient: Ratio::new(BigUint::from(150u32), BigUint::from(100u32)),
     }
 }
 
@@ -190,12 +180,12 @@ struct ErrorTickerApi;
 
 #[async_trait::async_trait]
 impl TokenPriceAPI for ErrorTickerApi {
-    async fn get_price(&self, _token_symbol: &str) -> Result<TokenPrice, PriceError> {
+    async fn get_price(&self, _token: &Token) -> Result<TokenPrice, PriceError> {
         Err(PriceError::token_not_found("Wrong token"))
     }
 }
 
-fn run_server() -> (String, AbortHandle) {
+fn run_server(token_address: Address) -> (String, AbortHandle) {
     let mut url = None;
     let mut server = None;
     for i in 9000..9999 {
@@ -209,10 +199,15 @@ fn run_server() -> (String, AbortHandle) {
                         HttpResponse::MethodNotAllowed()
                     })),
                 )
-                .service(web::resource("/api/v3/coins/list").to(|| {
+                .service(web::resource("/api/v3/coins/list").to(move || {
+                    let mut platforms = HashMap::new();
+                    platforms.insert(
+                        String::from("ethereum"),
+                        serde_json::Value::String(serde_json::to_string(&token_address).unwrap()),
+                    );
                     HttpResponse::Ok().json(CoinGeckoTokenList(vec![CoinGeckoTokenInfo {
-                        id: "DAI".to_string(),
-                        symbol: "DAI".to_string(),
+                        id: "dai".to_string(),
+                        platforms,
                     }]))
                 }))
         })
@@ -295,7 +290,7 @@ fn test_ticker_formula() {
     // Cost of the transfer and withdraw in USD should be the same for all tokens up to +/- 3 digits
     // (mantissa len == 11)
     let threshold = BigDecimal::from_str("0.01").unwrap();
-    for token in TestToken::subsidized_tokens() {
+    for token in &[TestToken::eth(), TestToken::expensive()] {
         let transfer_fee =
             get_token_fee_in_usd(TxFeeTypes::Transfer, token.id.into(), Address::default());
         let expected_fee = expected_price_of_eth_token_transfer_usd.clone() * token.risk_factor();
@@ -386,7 +381,14 @@ fn test_zero_price_token_fee() {
 #[ignore]
 // It's ignore because we can't initialize coingecko in current way with block
 async fn test_error_coingecko_api() {
-    let (address, handler) = run_server();
+    let token = Token {
+        id: TokenId(1),
+        address: Address::random(),
+        symbol: String::from("DAI"),
+        decimals: 18,
+        is_nft: false,
+    };
+    let (address, handler) = run_server(token.address);
     let client = reqwest::ClientBuilder::new()
         .timeout(CONNECTION_TIMEOUT)
         .connect_timeout(CONNECTION_TIMEOUT)
@@ -401,20 +403,25 @@ async fn test_error_coingecko_api() {
         FakeTokenWatcher,
     );
     let connection_pool = ConnectionPool::new(Some(1));
-    connection_pool
-        .access_storage()
-        .await
-        .unwrap()
-        .tokens_schema()
-        .update_historical_ticker_price(
-            TokenId(1),
-            TokenPrice {
-                usd_price: big_decimal_to_ratio(&BigDecimal::from(10)).unwrap(),
-                last_updated: chrono::offset::Utc::now(),
-            },
-        )
-        .await
-        .unwrap();
+    {
+        let mut storage = connection_pool.access_storage().await.unwrap();
+        storage
+            .tokens_schema()
+            .store_token(token.clone())
+            .await
+            .unwrap();
+        storage
+            .tokens_schema()
+            .update_historical_ticker_price(
+                token.id,
+                TokenPrice {
+                    usd_price: big_decimal_to_ratio(&BigDecimal::from(10)).unwrap(),
+                    last_updated: chrono::offset::Utc::now(),
+                },
+            )
+            .await
+            .unwrap();
+    }
     let ticker_api = TickerApi::new(connection_pool, coingecko);
 
     let config = get_test_ticker_config();
@@ -429,13 +436,13 @@ async fn test_error_coingecko_api() {
         ticker
             .get_fee_from_ticker_in_wei(
                 TxFeeTypes::FastWithdraw,
-                TokenId(1).into(),
+                token.id.into(),
                 Address::default(),
             )
             .await
             .unwrap();
         ticker
-            .get_token_price(TokenId(1).into(), TokenPriceRequestType::USDForOneWei)
+            .get_token_price(token.id.into(), TokenPriceRequestType::USDForOneWei)
             .await
             .unwrap();
     }
