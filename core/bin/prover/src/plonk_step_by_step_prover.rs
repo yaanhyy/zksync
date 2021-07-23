@@ -87,7 +87,7 @@ impl PlonkStepByStepProver {
         let verified_proof = precomp
             .setup
             .gen_step_by_step_proof_using_prepared_setup(witness, &vk)?;
-
+        info!("finish gen_step_by_step_proof_using_prepared_setup");
         *self.prepared_computations.lock().unwrap() = Some(precomp);
 
         Ok(verified_proof)

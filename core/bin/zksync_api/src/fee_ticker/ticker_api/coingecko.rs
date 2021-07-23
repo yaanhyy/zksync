@@ -25,24 +25,24 @@ impl CoinGeckoAPI {
             .join("api/v3/coins/list?include_platform=true")
             .expect("failed to join URL path");
 
-        let token_list = reqwest::blocking::get(token_list_url)
-            .map_err(|err| anyhow::format_err!("CoinGecko API request failed: {}", err))?
-            .json::<CoinGeckoTokenList>()?;
+        // let token_list = reqwest::blocking::get(token_list_url)
+        //     .map_err(|err| anyhow::format_err!("CoinGecko API request failed: {}", err))?
+        //     .json::<CoinGeckoTokenList>()?;
 
         let mut token_ids = HashMap::new();
-        for token in token_list.0 {
-            if let Some(address_value) = token.platforms.get("ethereum") {
-                if let Some(address_str) = address_value.as_str() {
-                    let address_str = remove_prefix(address_str);
-                    if let Ok(address) = Address::from_str(address_str) {
-                        token_ids.insert(address, token.id);
-                    }
-                }
-            }
-        }
-
-        // Add ETH manually because coingecko API doesn't return address for it.
-        token_ids.insert(Address::default(), String::from("ethereum"));
+        // for token in token_list.0 {
+        //     if let Some(address_value) = token.platforms.get("ethereum") {
+        //         if let Some(address_str) = address_value.as_str() {
+        //             let address_str = remove_prefix(address_str);
+        //             if let Ok(address) = Address::from_str(address_str) {
+        //                 token_ids.insert(address, token.id);
+        //             }
+        //         }
+        //     }
+        // }
+        //
+        // // Add ETH manually because coingecko API doesn't return address for it.
+        // token_ids.insert(Address::default(), String::from("ethereum"));
 
         Ok(Self {
             base_url,

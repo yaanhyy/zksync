@@ -594,6 +594,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
     let main_wallet = make_wallet(provider.clone(), eth_main_account_credentials()).await?;
     let sync_depositor_wallet =
         make_wallet(provider.clone(), eth_random_account_credentials()).await?;
+    //0xa0b98439F3A4a637555b80fE57991F42382154e9
     let mut alice_wallet1 = make_wallet(provider.clone(), eth_user_account_credentials("2d41f0926ed4dc38f511cad322f974a8398792cee9079fb9d7e658edf4ee9712")).await?;
     let bob_wallet1 = make_wallet(provider.clone(), eth_user_account_credentials("f743a8ac1a163c1db8abad36960a6b685507f0feac3e761fe910aec7a7bd0b68")).await?;
 

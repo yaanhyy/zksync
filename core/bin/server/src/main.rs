@@ -38,7 +38,7 @@ async fn main() -> anyhow::Result<()> {
         _sentry_guard = vlog::init();
         ServerCommand::Launch
     };
-    server_mode = ServerCommand::Launch;
+    server_mode = ServerCommand::Genesis;
     if let ServerCommand::Genesis = server_mode {
         vlog::info!("Performing the server genesis initialization",);
         genesis_init(&config).await;

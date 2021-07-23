@@ -94,5 +94,17 @@
     "decimals": 18,
     "symbol": "ZRX",
     "name": "0x Protocol Token"
+  },
+  {
+    "address": "0x11D9101E3C41cAbc0CC477F2a548C95d0874Cd51",
+    "decimals": 6,
+    "symbol": "YY",
+    "name": "YY Stablecoin"
+  },
+  {
+    "address": "0x0e107F10f2fe1c80b5Bd38C08F248Fe235060772",
+    "decimals": 18,
+    "symbol": "UU",
+    "name": "UU Stablecoin"
   }
 ]

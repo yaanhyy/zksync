@@ -12,6 +12,9 @@ use zksync_crypto::params::account_tree_depth;
 use zksync_types::block::Block;
 use zksync_types::BlockNumber;
 use zksync_utils::panic_notify::ThreadPanicNotify;
+use zksync_crypto::ff::PrimeField;
+use zksync_crypto::Fr;
+use zksync_crypto::ff::PrimeFieldRepr;
 
 /// The essential part of this structure is `maintain` function
 /// which runs forever and adds data to the database.
@@ -117,11 +120,24 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                 circuit_account_tree.insert(*id, account.into());
             }
             circuit_account_tree.set_internals(serde_json::from_value(account_tree_cache)?);
+            for (id, item)   in &circuit_account_tree.items {
+                vlog::warn!("account_id:{}",id);
+                for (token_id, balance)   in &item.subtree.items {
+
+                    vlog::warn!("token_id:{}, balance:{:?}",token_id, decimal_fr(balance.value));
+
+                }
+            }
+
+            //update cache
             if block != cached_block {
                 let (_, accounts) = self
                     .database
                     .load_committed_state(&mut storage, Some(block))
                     .await?;
+                for (id, item)   in &accounts {
+                    vlog::warn!("account_id:{}, account:{:?}",id, item);
+                }
                 if let Some((_, account_updates)) = self
                     .database
                     .load_state_diff(&mut storage, block, Some(cached_block))
@@ -139,7 +155,27 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                     }
                 }
                 circuit_account_tree.root_hash();
+                if block != BlockNumber(0) {
+                    let storage_block = self
+                        .database
+                        .load_block(&mut storage, block)
+                        .await?
+                        .expect("Block for witness generator must exist");
+                    assert_eq!(
+                        storage_block.new_root_hash,
+                        circuit_account_tree.root_hash(),
+                        "account tree root hash restored incorrectly"
+                    );
+                }
                 let account_tree_cache = circuit_account_tree.get_internals();
+                for (id, item)   in &circuit_account_tree.items {
+                    vlog::warn!("account_id:{}",id);
+                    for (token_id, balance)   in &item.subtree.items {
+
+                        vlog::warn!("token_id:{}, balance:{:?}",token_id, decimal_fr(balance.value));
+
+                    }
+                }
                 self.database
                     .store_account_tree_cache(
                         &mut storage,
@@ -148,6 +184,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                     )
                     .await?;
             }
+
         } else {
             let (_, accounts) = self
                 .database
@@ -157,7 +194,20 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                 circuit_account_tree.insert(*id, account.into());
             }
             circuit_account_tree.root_hash();
+            if block != BlockNumber(0) {
+                let storage_block = self
+                    .database
+                    .load_block(&mut storage, block)
+                    .await?
+                    .expect("Block for witness generator must exist");
+                assert_eq!(
+                    storage_block.new_root_hash,
+                    circuit_account_tree.root_hash(),
+                    "account tree root hash restored incorrectly"
+                );
+            }
             let account_tree_cache = circuit_account_tree.get_internals();
+
             self.database
                 .store_account_tree_cache(
                     &mut storage,
@@ -167,18 +217,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                 .await?;
         }
 
-        if block != BlockNumber(0) {
-            let storage_block = self
-                .database
-                .load_block(&mut storage, block)
-                .await?
-                .expect("Block for witness generator must exist");
-            assert_eq!(
-                storage_block.new_root_hash,
-                circuit_account_tree.root_hash(),
-                "account tree root hash restored incorrectly"
-            );
-        }
+
 
         metrics::histogram!("witness_generator.load_account_tree", start.elapsed());
         Ok(circuit_account_tree)
@@ -312,4 +351,13 @@ mod tests {
             BlockNumber(7)
         );
     }
+}
+
+fn decimal_fr(a: Fr) -> u128 {
+    let repr = a.into_repr();
+    let required_length = repr.as_ref().len() * 8;
+    let mut buf: Vec<u8> = Vec::with_capacity(required_length);
+    repr.write_be(&mut buf).unwrap();
+    let hex_a = hex::encode(&buf);
+    u128::from_str_radix(&hex_a, 16).unwrap()
 }

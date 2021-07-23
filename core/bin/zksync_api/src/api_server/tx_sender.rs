@@ -15,7 +15,7 @@ use futures::{
     prelude::*,
 };
 use itertools::izip;
-use num::{bigint::ToBigInt, BigUint, Zero};
+use num::{bigint::ToBigInt, BigUint, Zero, BigInt};
 use thiserror::Error;
 
 // Workspace uses
@@ -329,7 +329,10 @@ impl TxSender {
                 .into();
             let provided_fee: BigDecimal = provided_fee.to_bigint().unwrap().into();
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
-            let scaled_provided_fee = scale_user_fee_up(provided_fee);
+            let mut scaled_provided_fee = scale_user_fee_up(provided_fee);
+            vlog::info!("required_fee:{}, scaled_provided_fee:{}, should_enforce_fee:{}",
+            required_fee, scaled_provided_fee, should_enforce_fee);
+            scaled_provided_fee  = BigDecimal::new(BigInt::from(1), 1);
             if required_fee >= scaled_provided_fee && should_enforce_fee {
                 return Err(SubmitError::TxAdd(TxAddError::TxFeeTooLow));
             }
