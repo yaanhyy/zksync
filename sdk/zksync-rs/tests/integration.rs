@@ -496,10 +496,10 @@ where
     // test_deposit(depositor_wallet, alice, &token, deposit_amount).await?;
     // println!("Deposit ok, Token: {}", token.symbol);
 
-    test_change_pubkey(alice, &token.symbol).await?;
+    test_change_pubkey(bob, &token.symbol).await?;
     println!("Change pubkey ok");
 
-    test_transfer(alice, bob, &token.symbol, transfer_amount).await?;
+    test_transfer(bob, alice, &token.symbol, transfer_amount).await?;
     println!("Transfer to new ok, Token: {}", token.symbol);
 
     test_transfer(alice, bob, &token.symbol, transfer_amount).await?;
@@ -591,7 +591,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
     init_log("info");
     let provider = RpcProvider::new(Network::Localhost);
 
-    let main_wallet = make_wallet(provider.clone(), eth_main_account_credentials()).await?;
+    //let main_wallet = make_wallet(provider.clone(), eth_main_account_credentials()).await?;
     let sync_depositor_wallet =
         make_wallet(provider.clone(), eth_random_account_credentials()).await?;
     //0xa0b98439F3A4a637555b80fE57991F42382154e9

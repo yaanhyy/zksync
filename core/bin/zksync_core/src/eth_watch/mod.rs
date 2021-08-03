@@ -558,7 +558,7 @@ impl<W: EthClient> EthWatch<W> {
                     }
 
                     let poll_result = self.poll_eth_node().await;
-
+                    tokio::time::delay_for(time::Duration::from_secs(1)).await;
                     if let Err(error) = poll_result {
                         if self.is_backoff_requested(&error) {
                             vlog::warn!(
