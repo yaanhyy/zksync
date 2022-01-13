@@ -52,5 +52,17 @@
     "symbol": "MLTT",
     "decimals": 18,
     "address": "0xb36B2e278F5F1980631aD10F693AB3E1bEBd9f70"
+  },
+  {
+    "address": "0xDAe6c659d3ae408C1f569C33019E8Bd3dB4b8282",
+    "decimals": 6,
+    "symbol": "YY",
+    "name": "YY Stablecoin"
+  },
+  {
+    "address": "0x72ce3499cD8E8dBb4671cF1e0E2aFa6880f8B228",
+    "decimals": 18,
+    "symbol": "UU",
+    "name": "UU Stablecoin"
   }
 ]
