@@ -53,7 +53,7 @@ fn main() {
 
     match opt.command {
         Command::Keys => {
-            make_plonk_exodus_verify_key();
+            //make_plonk_exodus_verify_key();
             make_plonk_blocks_verify_keys(config.clone());
             make_recursive_verification_keys(config.clone());
             make_sample_proofs(config).expect("Failed to generate sample proofs");

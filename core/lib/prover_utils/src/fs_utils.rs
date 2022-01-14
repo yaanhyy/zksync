@@ -36,6 +36,7 @@ fn get_universal_setup_file_buff_reader(
     let setup_file = {
         let mut path = base_universal_setup_dir()?;
         path.push(&setup_file_name);
+        vlog::info!("setup path:{:?}", path);
         File::open(path).map_err(|e| {
             format_err!(
                 "Failed to open universal setup file {}, err: {}",
@@ -83,6 +84,7 @@ pub fn get_exodus_verification_key_path() -> PathBuf {
 
 pub fn get_block_verification_key_path(block_chunks: usize) -> PathBuf {
     let mut key = get_keys_root_dir();
+    vlog::info!("verification_key_path path:{:?}", key);
     key.push(&format!("verification_block_{}.key", block_chunks));
     key
 }

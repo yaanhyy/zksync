@@ -93,7 +93,7 @@ impl PendingBlock {
             unprocessed_priority_op_before,
             pending_block_iteration: 0,
             gas_counter: GasCounter::new(),
-            fast_processing_required: false,
+            fast_processing_required: true,
             collected_fees: Vec::new(),
             stored_account_updates: 0,
             previous_block_root_hash,
