@@ -431,9 +431,9 @@ impl TxSender {
             let provided_fee: BigDecimal = provided_fee.to_bigint().unwrap().into();
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
             let scaled_provided_fee = scale_user_fee_up(provided_fee);
-            if required_fee >= scaled_provided_fee && should_enforce_fee {
-                return Err(SubmitError::TxAdd(TxAddError::TxFeeTooLow));
-            }
+            // if required_fee >= scaled_provided_fee && should_enforce_fee {
+            //     return Err(SubmitError::TxAdd(TxAddError::TxFeeTooLow));
+            // }
         }
 
         let tx_sender = self
@@ -571,14 +571,14 @@ impl TxSender {
                 BigDecimal::from(batch_token_fee.normal_fee.total_fee.to_bigint().unwrap());
 
             // Not enough fee
-            if required_normal_fee > user_provided_fee {
-                vlog::error!(
-                    "User provided batch fee in token is too low, required: {}, provided (scaled): {}",
-                    required_normal_fee.to_string(),
-                    user_provided_fee.to_string(),
-                );
-                return Err(SubmitError::TxAdd(TxAddError::TxBatchFeeTooLow));
-            }
+            // if required_normal_fee > user_provided_fee {
+            //     vlog::error!(
+            //         "User provided batch fee in token is too low, required: {}, provided (scaled): {}",
+            //         required_normal_fee.to_string(),
+            //         user_provided_fee.to_string(),
+            //     );
+            //     return Err(SubmitError::TxAdd(TxAddError::TxBatchFeeTooLow));
+            // }
         } else {
             // Calculate required fee for ethereum token
             let required_eth_fee = Self::ticker_batch_fee_request(
@@ -602,16 +602,16 @@ impl TxSender {
 
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
             let scaled_provided_fee_in_usd = scale_user_fee_up(provided_total_usd_fee.clone());
-            if required_total_usd_fee > scaled_provided_fee_in_usd {
-                vlog::error!(
-                    "User provided batch fee is too low, required: {}, provided: {} (scaled: {}); difference {}",
-                    &required_total_usd_fee,
-                    provided_total_usd_fee.to_string(),
-                    scaled_provided_fee_in_usd.to_string(),
-                    (&required_total_usd_fee - &scaled_provided_fee_in_usd).to_string(),
-                );
-                return Err(SubmitError::TxAdd(TxAddError::TxBatchFeeTooLow));
-            }
+            // if required_total_usd_fee > scaled_provided_fee_in_usd {
+            //     vlog::error!(
+            //         "User provided batch fee is too low, required: {}, provided: {} (scaled: {}); difference {}",
+            //         &required_total_usd_fee,
+            //         provided_total_usd_fee.to_string(),
+            //         scaled_provided_fee_in_usd.to_string(),
+            //         (&required_total_usd_fee - &scaled_provided_fee_in_usd).to_string(),
+            //     );
+            //     return Err(SubmitError::TxAdd(TxAddError::TxBatchFeeTooLow));
+            // }
         }
 
         for tx in txs.iter() {

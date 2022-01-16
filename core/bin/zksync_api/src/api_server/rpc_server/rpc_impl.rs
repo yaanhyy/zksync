@@ -30,8 +30,11 @@ use super::{types::*, RpcApp};
 impl RpcApp {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
         let start = Instant::now();
-
-        let account_state = self.get_account_state(address).await?;
+        let res = self.get_account_state(address).await;
+        if res.is_err() {
+            vlog::warn!("Failed to handle account_info: {:?}",res);
+        }
+        let account_state = res.unwrap();
 
         let mut storage = self.access_storage().await?;
         let depositing = get_depositing(

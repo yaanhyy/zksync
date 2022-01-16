@@ -86,7 +86,7 @@ async fn main() -> anyhow::Result<()> {
         stop_signal_sender.clone(),
         eth_gateway.clone(),
         &config,
-    );
+    ).await;
 
     // Run Ethereum sender actors.
     vlog::info!("Starting the Ethereum sender actors");

@@ -42,11 +42,15 @@ use zksync::{
     EthereumProvider, Network, RpcProvider, Wallet, WalletCredentials,
 };
 use zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
-
+use parity_crypto::{
+    publickey::{public_to_address, recover, sign, KeyPair, Signature as ETHSignature},
+    Keccak256,
+};
+use log::info;
 const ETH_ADDR: &str = "36615Cf349d7F6344891B1e7CA7C72883F5dc049";
 const ETH_PRIVATE_KEY: &str = "7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110";
-const LOCALHOST_WEB3_ADDR: &str = "http://127.0.0.1:8545";
-const DOCKER_WEB3_ADDR: &str = "http://geth:8545";
+const LOCALHOST_WEB3_ADDR: &str = "https://ropsten.infura.io/v3/f350ad3f29df430bbcac0ee72826ea6e";
+const DOCKER_WEB3_ADDR: &str = "https://ropsten.infura.io/v3/f350ad3f29df430bbcac0ee72826ea6e";
 
 fn web3_addr() -> &'static str {
     let ci: u8 = env::var("CI").map_or(0, |s| s.parse().unwrap());
@@ -480,31 +484,31 @@ where
     let transfer_amount = deposit_amount / 10;
     let withdraw_amount = deposit_amount / 10;
 
-    test_deposit(depositor_wallet, alice, &token, deposit_amount).await?;
-    println!("Deposit ok, Token: {}", token.symbol);
+    // test_deposit(depositor_wallet, alice, &token, deposit_amount).await?;
+    // println!("Deposit ok, Token: {}", token.symbol);
 
-    test_change_pubkey(alice, &token.symbol).await?;
-    println!("Change pubkey ok");
+    // test_change_pubkey(bob, &token.symbol).await?;
+    // println!("Change pubkey ok");
 
-    test_transfer(alice, bob, &token.symbol, transfer_amount).await?;
+    test_transfer(bob,alice,  &token.symbol, transfer_amount).await?;
     println!("Transfer to new ok, Token: {}", token.symbol);
 
     test_transfer(alice, bob, &token.symbol, transfer_amount).await?;
     println!("Transfer ok, Token: {}", token.symbol);
 
-    test_transfer_to_self(&alice, &token.symbol, transfer_amount).await?;
-    println!("Transfer to self ok, Token: {}", token.symbol);
+    // test_transfer_to_self(&alice, &token.symbol, transfer_amount).await?;
+    // println!("Transfer to self ok, Token: {}", token.symbol);
 
-    test_withdraw(
-        &eth_provider,
-        &main_contract,
-        &alice,
-        &bob,
-        &token,
-        withdraw_amount,
-    )
-    .await?;
-    println!("Withdraw ok, Token: {}", token.symbol);
+    // test_withdraw(
+    //     &eth_provider,
+    //     &main_contract,
+    //     &alice,
+    //     &bob,
+    //     &token,
+    //     withdraw_amount,
+    // )
+    // .await?;
+    // println!("Withdraw ok, Token: {}", token.symbol);
 
     // Currently fast withdraw aren't supported by zksync-rs, but they will be in the near future.
     // test_fast_withdraw(eth, main_contract, &bob, &bob, &token, withdraw_amount);
@@ -564,24 +568,35 @@ async fn init_account_with_one_ether(
 
 async fn make_wallet(
     provider: RpcProvider,
-    (eth_address, eth_private_key): (H160, H256),
+    (eth_address, eth_private_key): (H160, H256), network: Network
 ) -> Result<Wallet<PrivateKeySigner, RpcProvider>, ClientError> {
     let eth_signer = PrivateKeySigner::new(eth_private_key);
     let credentials =
-        WalletCredentials::from_eth_signer(eth_address, eth_signer, Network::Localhost).await?;
+        WalletCredentials::from_eth_signer(eth_address, eth_signer, network).await?;
     Wallet::new(provider, credentials).await
 }
 
+fn eth_user_account_credentials(private_key: &str) -> (H160, H256) {
+    let eth_private_key: H256 = private_key.parse().unwrap();
+    let pair = KeyPair::from_secret((eth_private_key).into()).unwrap();
+    info!("pub:{:?}", pair.public());
+    let address_from_pk = PackedEthSignature::address_from_private_key(&eth_private_key).unwrap();
+    info!{"user address:{:?}", address_from_pk};
+    (address_from_pk, eth_private_key)
+}
+
 #[tokio::test]
-#[cfg_attr(not(feature = "integration-tests"), ignore)]
+// #[cfg_attr(not(feature = "integration-tests"), ignore)]
 async fn comprehensive_test() -> Result<(), anyhow::Error> {
+    init_log("info");
     let provider = RpcProvider::new(Network::Localhost);
 
-    let main_wallet = make_wallet(provider.clone(), eth_main_account_credentials()).await?;
+    let main_wallet = make_wallet(provider.clone(), eth_user_account_credentials("1e933cec930afa3d7e2771b423e4e096ea396051ad28f6faa939ae2268891cf4"), Network::Localhost).await?;
+        //make_wallet(provider.clone(), eth_main_account_credentials()).await?;
     let sync_depositor_wallet =
-        make_wallet(provider.clone(), eth_random_account_credentials()).await?;
-    let mut alice_wallet1 = make_wallet(provider.clone(), eth_random_account_credentials()).await?;
-    let bob_wallet1 = make_wallet(provider.clone(), eth_random_account_credentials()).await?;
+        make_wallet(provider.clone(), eth_random_account_credentials(),Network::Localhost).await?;
+    let mut alice_wallet1 = make_wallet(provider.clone(), eth_user_account_credentials("1e933cec930afa3d7e2771b423e4e096ea396051ad28f6faa939ae2268891cf4"),Network::Localhost).await?;
+    let bob_wallet1 = make_wallet(provider.clone(), eth_user_account_credentials("0dae11faa7b5075c426a88888f4d2250aeea58b2f0c68c4c428f28df8d56e129"),Network::Localhost).await?;
 
     let ethereum = main_wallet.ethereum(web3_addr()).await?;
 
@@ -602,31 +617,30 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         .tokens
         .resolve("ETH".into())
         .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
-    let token_dai = sync_depositor_wallet
-        .tokens
-        .resolve("DAI".into())
-        .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
+    // let token_dai = sync_depositor_wallet
+    //     .tokens
+    //     .resolve("DAI".into())
+    //     .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
 
     let dai_deposit_amount = U256::from(10).pow(18.into()) * 10000; // 10000 DAI
 
     // Move ETH to wallets so they will have some funds for L1 transactions.
-    let eth_deposit_amount = U256::from(10).pow(17.into()); // 0.1 ETH
-    transfer_to("ETH", eth_deposit_amount, sync_depositor_wallet.address()).await?;
-    transfer_to("ETH", eth_deposit_amount, alice_wallet1.address()).await?;
-    transfer_to("ETH", eth_deposit_amount, bob_wallet1.address()).await?;
+    let eth_deposit_amount = U256::from(10).pow(16.into()); // 0.1 ETH
+    // transfer_to("ETH", eth_deposit_amount, sync_depositor_wallet.address()).await?;
+    // transfer_to("ETH", eth_deposit_amount, alice_wallet1.address()).await?;
+    // transfer_to("ETH", eth_deposit_amount, bob_wallet1.address()).await?;
+    //
+    // transfer_to("DAI", dai_deposit_amount, sync_depositor_wallet.address()).await?;
 
-    transfer_to("DAI", dai_deposit_amount, sync_depositor_wallet.address()).await?;
-
-    assert_eq!(
-        get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_eth).await?,
-        eth_deposit_amount
+    assert!(
+        (get_ethereum_balance(&ethereum, bob_wallet1.address(), &token_eth).await? > eth_deposit_amount), "amount need big than "
     );
-    assert_eq!(
-        get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_dai).await?,
-        dai_deposit_amount
-    );
+    // assert_eq!(
+    //     get_ethereum_balance(&ethereum, alice_wallet1.address(), &token_dai).await?,
+    //     dai_deposit_amount
+    // );
 
-    test_tx_fail(&sync_depositor_wallet).await?;
+    // test_tx_fail(&sync_depositor_wallet).await?;
 
     move_funds(
         &main_contract,
@@ -634,9 +648,9 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         &sync_depositor_wallet,
         &mut alice_wallet1,
         &bob_wallet1,
-        "DAI",
+        "ETH",
         // 200 DAI
-        200_000_000_000_000_000_000u128,
+        eth_deposit_amount.as_u128(),
     )
     .await?;
 
@@ -906,4 +920,22 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+pub fn init_log(log_level: &str){
+    use std::io::Write;
+    use chrono::Local;
+    let env = env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV,log_level);
+    env_logger::Builder::from_env(env).format(|buf,record|{
+        writeln!(
+            buf,
+            "{} {} [{}:{}] {} {}",
+            Local::now().format("%Y-%m-%d %H:%M:%S"),
+            record.level(),
+            record.module_path().unwrap_or("<unnamed>"),
+            record.line().unwrap_or(0),
+            record.target(),
+            &record.args()
+        )
+    }).init();
 }

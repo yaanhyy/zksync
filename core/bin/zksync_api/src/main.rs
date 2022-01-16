@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
 
     let gateway_watcher_task_opt = run_gateway_watcher_if_multiplexed(eth_gateway.clone(), &config);
 
-    let task_handle = run_api(connection_pool, stop_signal_sender, eth_gateway, &config);
+    let task_handle = run_api(connection_pool, stop_signal_sender, eth_gateway, &config).await;
 
     tokio::select! {
         _ = async { task_handle.await } => {

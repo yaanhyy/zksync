@@ -250,7 +250,7 @@ impl<API: Clone, INFO: Clone, WATCHER: Clone>
 }
 
 #[must_use]
-pub fn run_ticker_task(
+pub async fn run_ticker_task(
     db_pool: ConnectionPool,
     tricker_requests: Receiver<TickerRequest>,
     config: &ZkSyncConfig,
@@ -309,8 +309,8 @@ pub fn run_ticker_task(
 
         TokenPriceSource::CoinGecko => {
             let token_price_api =
-                CoinGeckoAPI::new(client, base_url.parse().expect("Correct CoinGecko url"))
-                    .expect("failed to init CoinGecko client");
+                CoinGeckoAPI::new(client, base_url.parse().expect("Correct CoinGecko url")).await.unwrap();
+                    // .expect("failed to init CoinGecko client")
             let ticker_info = TickerInfo::new(db_pool.clone());
 
             let token_db_cache = TokenDBCache::new();
@@ -546,9 +546,12 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             .usd_price
             / BigUint::from(10u32).pow(u32::from(token.decimals));
         // TODO Check tokens fee allowance by non-zero price (ZKS-580)
-        token_risk_factor
-            .checked_div(&token_price_usd)
-            .ok_or_else(|| anyhow::format_err!("Token is not acceptable for fee"))
+        // token_risk_factor
+        //     .checked_div(&token_price_usd)
+        //     .ok_or_else(|| anyhow::format_err!("Token is not acceptable for fee"))
+        // todo test
+            let res = Ratio::new(BigUint::from(0_u32), BigUint::from(1_u32));
+            Ok(res)
     }
 
     /// Returns `true` if account does not yet exist in the zkSync network.

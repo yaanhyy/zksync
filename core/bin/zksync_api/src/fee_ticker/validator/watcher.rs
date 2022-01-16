@@ -100,6 +100,7 @@ pub struct TokenResponse {
 #[async_trait::async_trait]
 impl TokenWatcher for UniswapTokenWatcher {
     async fn get_token_market_volume(&mut self, token: &Token) -> anyhow::Result<BigDecimal> {
+        return Ok(BigDecimal::from(0));
         match self.get_market_volume(token.address).await {
             Ok(amount) => {
                 self.update_historical_amount(token.address, amount.clone())
@@ -108,6 +109,7 @@ impl TokenWatcher for UniswapTokenWatcher {
             }
             Err(err) => {
                 vlog::error!("Error in api: {:?}", err);
+                return Ok(BigDecimal::from(0));
             }
         }
 

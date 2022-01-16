@@ -15,7 +15,7 @@ pub mod tx_error;
 pub mod utils;
 
 /// Runs the application actors.
-pub fn run_api(
+pub async fn run_api(
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
     eth_gateway: EthereumGateway,
@@ -24,7 +24,7 @@ pub fn run_api(
     let channel_size = 32768;
     let (ticker_request_sender, ticker_request_receiver) = mpsc::channel(channel_size);
 
-    let ticker_task = run_ticker_task(connection_pool.clone(), ticker_request_receiver, config);
+    let ticker_task = run_ticker_task(connection_pool.clone(), ticker_request_receiver, config).await;
 
     start_api_server(
         connection_pool,

@@ -55,13 +55,13 @@ impl<W: TokenWatcher> MarketUpdater<W> {
             last_updated: Utc::now(),
         };
 
-        if let Err(e) = self
-            .tokens_cache
-            .update_token_market_volume(token.id, market.clone())
-            .await
-        {
-            vlog::error!("Error in updating token market volume {}", e);
-        }
+        // if let Err(e) = self
+        //     .tokens_cache
+        //     .update_token_market_volume(token.id, market.clone())
+        //     .await
+        // {
+        //     vlog::error!("Error in updating token market volume {}", e);
+        // }
         Ok(market)
     }
 
