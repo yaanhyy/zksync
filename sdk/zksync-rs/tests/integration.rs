@@ -499,15 +499,15 @@ where
     // test_transfer_to_self(&alice, &token.symbol, transfer_amount).await?;
     // println!("Transfer to self ok, Token: {}", token.symbol);
 
-    // test_withdraw(
-    //     &eth_provider,
-    //     &main_contract,
-    //     &alice,
-    //     &bob,
-    //     &token,
-    //     withdraw_amount,
-    // )
-    // .await?;
+    test_withdraw(
+        &eth_provider,
+        &main_contract,
+        &alice,
+        &bob,
+        &token,
+        withdraw_amount,
+    )
+    .await?;
     // println!("Withdraw ok, Token: {}", token.symbol);
 
     // Currently fast withdraw aren't supported by zksync-rs, but they will be in the near future.
