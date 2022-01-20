@@ -1,7 +1,8 @@
 import { expect } from 'chai';
 import { BigNumber, ethers } from 'ethers';
 import { Wallet } from '../src/wallet';
-import { getTokens } from 'reading-tool';
+
+import { getTokens } from '../../../infrastructure/reading-tool';
 
 import { Provider } from '../src/provider';
 

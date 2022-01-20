@@ -14,7 +14,10 @@ impl TxHandler<Swap> for ZkSyncState {
     type OpError = SwapOpError;
 
     fn create_op(&self, tx: Swap) -> Result<Self::Op, Self::OpError> {
-        self.verify_order(&tx.orders.0)?;
+        let mut res = self.verify_order(&tx.orders.0);
+        if res.is_err() {
+            return Err(res.err().unwrap());
+        }
         self.verify_order(&tx.orders.1)?;
         invariant!(
             tx.submitter_id <= max_account_id(),
@@ -104,8 +107,11 @@ impl ZkSyncState {
             account.pub_key_hash != PubKeyHash::default(),
             SwapOpError::AccountLocked
         );
+
+        let mut verify_signature = order.verify_signature();
+        vlog::warn!("verify_signature:{:?}",verify_signature);
         invariant!(
-            order.verify_signature() == Some(account.pub_key_hash),
+            verify_signature == Some(account.pub_key_hash),
             SwapOpError::OrderInvalidSignature
         );
         Ok(())

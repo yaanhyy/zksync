@@ -487,14 +487,14 @@ where
     // test_deposit(depositor_wallet, alice, &token, deposit_amount).await?;
     // println!("Deposit ok, Token: {}", token.symbol);
 
-    // test_change_pubkey(bob, &token.symbol).await?;
+    test_change_pubkey(alice, &token.symbol).await?;
     // println!("Change pubkey ok");
 
     test_transfer(bob,alice,  &token.symbol, transfer_amount).await?;
     println!("Transfer to new ok, Token: {}", token.symbol);
 
-    test_transfer(alice, bob, &token.symbol, transfer_amount).await?;
-    println!("Transfer ok, Token: {}", token.symbol);
+    // test_transfer(alice, bob, &token.symbol, transfer_amount).await?;
+    // println!("Transfer ok, Token: {}", token.symbol);
 
     // test_transfer_to_self(&alice, &token.symbol, transfer_amount).await?;
     // println!("Transfer to self ok, Token: {}", token.symbol);
@@ -591,11 +591,11 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
     init_log("info");
     let provider = RpcProvider::new(Network::Localhost);
 
-    let main_wallet = make_wallet(provider.clone(), eth_user_account_credentials("1e933cec930afa3d7e2771b423e4e096ea396051ad28f6faa939ae2268891cf4"), Network::Localhost).await?;
+    let main_wallet = make_wallet(provider.clone(), eth_user_account_credentials("f743a8ac1a163c1db8abad36960a6b685507f0feac3e761fe910aec7a7bd0b68"), Network::Localhost).await?;
         //make_wallet(provider.clone(), eth_main_account_credentials()).await?;
     let sync_depositor_wallet =
         make_wallet(provider.clone(), eth_random_account_credentials(),Network::Localhost).await?;
-    let mut alice_wallet1 = make_wallet(provider.clone(), eth_user_account_credentials("1e933cec930afa3d7e2771b423e4e096ea396051ad28f6faa939ae2268891cf4"),Network::Localhost).await?;
+    let mut alice_wallet1 = make_wallet(provider.clone(), eth_user_account_credentials("f743a8ac1a163c1db8abad36960a6b685507f0feac3e761fe910aec7a7bd0b68"),Network::Localhost).await?;
     let bob_wallet1 = make_wallet(provider.clone(), eth_user_account_credentials("0dae11faa7b5075c426a88888f4d2250aeea58b2f0c68c4c428f28df8d56e129"),Network::Localhost).await?;
 
     let ethereum = main_wallet.ethereum(web3_addr()).await?;
@@ -625,16 +625,16 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
     let dai_deposit_amount = U256::from(10).pow(18.into()) * 10000; // 10000 DAI
 
     // Move ETH to wallets so they will have some funds for L1 transactions.
-    let eth_deposit_amount = U256::from(10).pow(16.into()); // 0.1 ETH
+    let eth_deposit_amount = U256::from(10).pow(18.into()); // 0.1 ETH
     // transfer_to("ETH", eth_deposit_amount, sync_depositor_wallet.address()).await?;
     // transfer_to("ETH", eth_deposit_amount, alice_wallet1.address()).await?;
     // transfer_to("ETH", eth_deposit_amount, bob_wallet1.address()).await?;
     //
     // transfer_to("DAI", dai_deposit_amount, sync_depositor_wallet.address()).await?;
 
-    assert!(
-        (get_ethereum_balance(&ethereum, bob_wallet1.address(), &token_eth).await? > eth_deposit_amount), "amount need big than "
-    );
+    // assert!(
+    //     (get_ethereum_balance(&ethereum, bob_wallet1.address(), &token_eth).await? > eth_deposit_amount), "amount need big than "
+    // );
     // assert_eq!(
     //     get_ethereum_balance(&ethereum, alice_wallet1.address(), &token_dai).await?,
     //     dai_deposit_amount

@@ -21,7 +21,7 @@ mod transfer;
 mod transfer_nft;
 mod withdraw;
 mod withdraw_nft;
-
+mod swap;
 /// Handle for transaction, providing an interface to control its execution.
 /// For obtained handle it's possible to set the polling interval, commit timeout
 /// and verify timeout values.

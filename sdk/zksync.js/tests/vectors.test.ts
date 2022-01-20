@@ -15,8 +15,9 @@ import {
     serializeTx
 } from '../src/utils';
 import { privateKeyFromSeed, signTransactionBytes } from '../src/crypto';
-import { loadTestVectorsConfig } from 'reading-tool';
+import { loadTestVectorsConfig } from '../../../infrastructure/reading-tool';
 import { MintNFT, WithdrawNFT } from '../src/types';
+import {MAX_TIMESTAMP} from "../build/utils";
 
 const vectors = loadTestVectorsConfig();
 const cryptoVectors = vectors.cryptoPrimitivesTest;
@@ -180,7 +181,20 @@ describe(txVectors.description, function () {
             const { signer, ethMessageSigner } = await getSigner(privateKey);
 
             if (txType === 'Swap') {
-                const signBytes = await zksync.utils.serializeSwap(order);
+                const signBytes = await zksync.utils.serializeOrder(
+                   // order
+                    {
+                        accountId: 2,
+                        recipient: "0x5e15EA6b1F025Deb6f80145d4BeaDB0BBA35AbA4",
+                        nonce: 1,
+                        amount:  BigNumber.from("100000000000000000"),
+                        tokenSell: 0,
+                        tokenBuy: 1,
+                        validFrom: 0,
+                        validUntil: MAX_TIMESTAMP,
+                        ratio: ["1000000000000000000","10000000000000000000"]
+                    }
+                );
                 const { signature } = await signer.signSyncSwap(order);
 
                 const { signature: ethSignature } = await ethMessageSigner.ethSignSwap(ethSignData);

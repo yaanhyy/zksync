@@ -10,13 +10,9 @@ use crate::{
 use num::{BigUint, Zero};
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
-use zksync_crypto::{
-    franklin_crypto::eddsa::PrivateKey,
-    params::{
-        max_account_id, max_processable_token, max_token_id, CURRENT_TX_VERSION, PRICE_BIT_WIDTH,
-    },
-    primitives::rescue_hash_orders,
-};
+use zksync_crypto::{franklin_crypto::eddsa::PrivateKey, params::{
+    max_account_id, max_processable_token, max_token_id, CURRENT_TX_VERSION, PRICE_BIT_WIDTH,
+}, primitives::rescue_hash_orders};
 use zksync_utils::{format_units, BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
@@ -81,6 +77,7 @@ impl Order {
         out.extend_from_slice(&pad_front(&self.price.1.to_bytes_be(), PRICE_BIT_WIDTH / 8));
         out.extend_from_slice(&pack_token_amount(&self.amount));
         out.extend_from_slice(&self.time_range.as_be_bytes());
+        vlog::warn!("out:{:?}", out);
         out
     }
 
