@@ -21,7 +21,6 @@ use zksync_crypto::ff::PrimeField;
 // #[derive(Debug)]
 pub struct SwapBuilder<'a, S: EthereumSigner, P: Provider> {
     wallet: &'a Wallet<S, P>,
-    sk: Option<PrivateKey<Engine>>,
     recipient: Option<Address>,
     orders: Option<(Order , Order)>,
     amounts:  Option<(BigUint , BigUint)>,
@@ -36,10 +35,9 @@ impl<'a, S, P> SwapBuilder<'a, S, P>
         P: Provider + Clone,
 {
     /// Initializes a mint nft transaction building process.
-    pub fn new(wallet: &'a Wallet<S, P>, sk: PrivateKey<Engine>) -> Self {
+    pub fn new(wallet: &'a Wallet<S, P>) -> Self {
         Self {
             wallet,
-            sk:Some(sk),
             recipient: None,
             orders: None,
             amounts: None,
@@ -157,7 +155,7 @@ impl<'a, S, P> SwapBuilder<'a, S, P>
 
 
     /// Sets the transaction content hash.
-    pub fn gen_order(mut self, account_id: u32, eth_sk: H256 , nonce: u32, amount: u128, token_id:(u32,u32), price: (u64,u64)) -> Order {
+    pub fn gen_order(mut self, account_id: u32, eth_sk: H256, nonce: u32, amount: u128, token_id:(u32,u32), price: (u64,u64)) -> Order {
         let address = PackedEthSignature::address_from_private_key(&eth_sk)
             .expect("Can't get address from the ETH secret key");
 
@@ -174,7 +172,7 @@ impl<'a, S, P> SwapBuilder<'a, S, P>
             ),
             BigUint::from(amount),
             Default::default(),
-            &self.sk.unwrap(),
+            &self.wallet.signer.private_key,
         ).expect("order creation failed");
         let verf = order.verify_signature();
         println!("verf:{:?}",verf);
@@ -213,18 +211,20 @@ pub fn read_signing_key(private_key: &[u8]) -> anyhow::Result<PrivateKey<Engine>
 #[tokio::test]
 async fn order_verify_test() {
     init_log("info");
-    let prv=  "0092788f3890ed50dcab7f72fb574a0a9d30b1bc778ba076c609c311a8555352";
-    // let prv = "f743a8ac1a163c1db8abad36960a6b685507f0feac3e761fe910aec7a7bd0b68";
-    let sk = H256::from_str(prv).unwrap();
+    // let prv=  "0092788f3890ed50dcab7f72fb574a0a9d30b1bc778ba076c609c311a8555352";
+    let prv = "f743a8ac1a163c1db8abad36960a6b685507f0feac3e761fe910aec7a7bd0b68";
     let provider = RpcProvider::new(Network::Localhost);
-    let mut alice_wallet1 = make_wallet(provider.clone(), eth_user_account_credentials("f743a8ac1a163c1db8abad36960a6b685507f0feac3e761fe910aec7a7bd0b68"),Network::Localhost).await.unwrap();
-    let sender_sk = hex::decode(prv)
-        .expect("Failed to decode forced_exit_sender sk");
-    let sender_sk = read_signing_key(&sender_sk).expect("Failed to read forced exit sender sk");
-    let pubkey_hash = PubKeyHash::from_privkey(&sender_sk);
+
+    let mut alice_wallet1 = make_wallet(provider.clone(), eth_user_account_credentials(prv),Network::Localhost).await.unwrap();
+
+    let sk = H256::from_str(prv).unwrap();
+    // let sender_sk = hex::decode(prv)
+    //     .expect("Failed to decode forced_exit_sender sk");
+    // let sender_sk = read_signing_key(&sender_sk).expect("Failed to read forced exit sender sk");
+    let pubkey_hash = PubKeyHash::from_privkey(&alice_wallet1.signer.private_key);
     info!("pubkey_hash:{:?}", pubkey_hash);
-    let swap_build  = SwapBuilder::new(&alice_wallet1, sender_sk);
-    swap_build.gen_order(0, sk, 1, 100_000_000_000_000_000, (0,1), (1000, 10000));
+    let swap_build  = SwapBuilder::new(&alice_wallet1);
+    swap_build.gen_order(0,  sk, 1, 100_000_000_000_000_000, (0,1), (1000, 10000));
 }
 
 pub fn init_log(log_level: &str){
