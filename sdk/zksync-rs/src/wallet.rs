@@ -158,6 +158,10 @@ where
         WithdrawNFTBuilder::new(self)
     }
 
+    pub fn start_swap(&self) -> SwapBuilder<'_, S, P> {
+        SwapBuilder::new(self)
+    }
+
     /// Creates an `EthereumProvider` to interact with the Ethereum network.
     ///
     /// Returns an error if wallet was created without providing an Ethereum private key.

@@ -3,7 +3,7 @@ use zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
 use zksync_types::{helpers::{closest_packable_fee_amount, is_fee_amount_packable}, tokens::TxFeeTypes, tx::PackedEthSignature, Address, Nonce, Token, TokenLike, ZkSyncTx, H256, Order, TokenId, AccountId, H160, PubKeyHash};
 
 use crate::{error::ClientError, operations::SyncTransactionHandle, provider::Provider, wallet::Wallet, RpcProvider, WalletCredentials};
-use zksync_crypto::{/* PrivateKey, */ Engine};
+use zksync_crypto::{Engine};
 pub use zksync_crypto::franklin_crypto::{
     alt_babyjubjub::fs::FsRepr,
     bellman::{pairing::bn256, PrimeFieldRepr},
@@ -17,12 +17,15 @@ use std::{convert::TryInto, ops::Sub};
 
 use num::FromPrimitive;
 use zksync_crypto::ff::PrimeField;
+use zksync_types::tx::TxEthSignature;
+use zksync_eth_signer::error::SignerError;
 
 // #[derive(Debug)]
 pub struct SwapBuilder<'a, S: EthereumSigner, P: Provider> {
     wallet: &'a Wallet<S, P>,
     recipient: Option<Address>,
     orders: Option<(Order , Order)>,
+    order_sigs: Vec<Option<PackedEthSignature>>,
     amounts:  Option<(BigUint , BigUint)>,
     fee_token: Option<Token>,
     fee: Option<BigUint>,
@@ -38,6 +41,7 @@ impl<'a, S, P> SwapBuilder<'a, S, P>
     pub fn new(wallet: &'a Wallet<S, P>) -> Self {
         Self {
             wallet,
+            order_sigs: Vec::new(),
             recipient: None,
             orders: None,
             amounts: None,
@@ -89,11 +93,17 @@ impl<'a, S, P> SwapBuilder<'a, S, P>
     }
 
     /// Sends the transaction, returning the handle for its awaiting.
-    pub async fn send(self) -> Result<SyncTransactionHandle<P>, ClientError> {
+    pub async fn send(self, order_sigs: (Option<PackedEthSignature>, Option<PackedEthSignature>)) -> Result<SyncTransactionHandle<P>, ClientError> {
         let provider = self.wallet.provider.clone();
 
         let (tx, eth_signature) = self.tx().await?;
-        let tx_hash = provider.send_tx(tx, eth_signature).await?;
+        let mut eth_sigs = Vec::new();
+        eth_sigs.push(eth_signature);
+        eth_sigs.push(order_sigs.0);
+        eth_sigs.push(order_sigs.1);
+
+
+        let tx_hash = provider.send_swap_tx(tx, Some(eth_sigs)).await?;
 
         Ok(SyncTransactionHandle::new(tx_hash, provider))
     }
@@ -148,14 +158,25 @@ impl<'a, S, P> SwapBuilder<'a, S, P>
 
     /// Sets the transaction content hash.
     pub fn orders(mut self, orders: (Order, Order)) -> Self {
+        self.amounts = Some((orders.0.amount.clone(), orders.1.amount.clone()));
         self.orders = Some(orders);
         self
     }
 
+    /// Sets the transaction recipient.
+    pub fn recipient(mut self, recipient: Address) -> Self {
+        self.recipient = Some(recipient);
+        self
+    }
+
+    pub fn amounts(mut self, amounts: (BigUint, BigUint)) -> Self {
+        self.amounts = Some(amounts);
+        self
+    }
 
 
     /// Sets the transaction content hash.
-    pub fn gen_order(mut self, account_id: u32, eth_sk: H256, nonce: u32, amount: u128, token_id:(u32,u32), price: (u64,u64)) -> Order {
+    pub async fn gen_order(&self, account_id: u32, eth_sk: H256, nonce: u32, amount: u128, token_id:(u32, u32), price: (u64, u64), zksync_priv: &PrivateKey<Engine>, token_sel: String, token_buy: String) -> (Order, Option<PackedEthSignature>) {
         let address = PackedEthSignature::address_from_private_key(&eth_sk)
             .expect("Can't get address from the ETH secret key");
 
@@ -172,11 +193,28 @@ impl<'a, S, P> SwapBuilder<'a, S, P>
             ),
             BigUint::from(amount),
             Default::default(),
-            &self.wallet.signer.private_key,
+            zksync_priv
         ).expect("order creation failed");
         let verf = order.verify_signature();
-        println!("verf:{:?}",verf);
-        return order;
+        info!("verf:{:?}",verf);
+        // let message = order.get_ethereum_sign_message("ETH","DAI", 18);
+
+        let eth_signature = match &self.wallet.signer.eth_signer {
+            Some(signer) => {
+                let message =
+                    order.get_ethereum_sign_message(&token_sel,&token_buy, 18);
+                let signature = signer.sign_message(&message.as_bytes()).await.unwrap();
+
+                if let TxEthSignature::EthereumSignature(packed_signature) = signature {
+                    Some(packed_signature)
+                } else {
+                    info!("{:?}",SignerError::MissingEthSigner);
+                    None
+                }
+            }
+            _ => None,
+        };
+        return (order, eth_signature);
     }
 }
 
@@ -224,7 +262,39 @@ async fn order_verify_test() {
     let pubkey_hash = PubKeyHash::from_privkey(&alice_wallet1.signer.private_key);
     info!("pubkey_hash:{:?}", pubkey_hash);
     let swap_build  = SwapBuilder::new(&alice_wallet1);
-    swap_build.gen_order(0,  sk, 1, 100_000_000_000_000_000, (0,1), (1000, 10000));
+    let order = swap_build.gen_order(0,  sk, 1, 100_000_000_000_000_000, (0,1), (1000, 10000),
+                                     &alice_wallet1.signer.private_key,"ETH".to_string() , "DAI".to_string() ).await;
+    info!("order:{:?},sig:{:?}", order.0, order.1);
+}
+
+#[tokio::test]
+async fn swap_tx_send_test() {
+    init_log("info");
+    let prv_order1 = "f743a8ac1a163c1db8abad36960a6b685507f0feac3e761fe910aec7a7bd0b68";
+    let prv_order2 = "0dae11faa7b5075c426a88888f4d2250aeea58b2f0c68c4c428f28df8d56e129";
+
+    let provider = RpcProvider::new(Network::Localhost);
+    let eth_sk_order1 = H256::from_str(prv_order1).unwrap();
+    let eth_sk_order2 = H256::from_str(prv_order2).unwrap();
+
+    let mut order1_wallet = make_wallet(provider.clone(), eth_user_account_credentials(prv_order1),Network::Localhost).await.unwrap();
+    let mut order2_wallet = make_wallet(provider.clone(), eth_user_account_credentials(prv_order2),Network::Localhost).await.unwrap();
+    let mut swap_build  = order1_wallet.start_swap();
+    let mut order_build  = order2_wallet.start_swap();
+
+    let mut order1 = swap_build.gen_order(2,  eth_sk_order1, 1, 100_000_000_000_000_000, (0,1), (1000, 10000), &order1_wallet.signer.private_key, "ETH".to_string() , "DAI".to_string()).await;
+    let mut order2 = order_build.gen_order(1,  eth_sk_order2, 3, 1_000_000_000_000_000_000, (1,0), ( 10000, 1000), &order2_wallet.signer.private_key, "DAI".to_string(), "ETH".to_string()).await;
+
+    let handle = swap_build.fee_token(TokenId(0)).unwrap().recipient(order1_wallet.address()).nonce(Nonce(1)).orders((order1.0,order2.0)).send((order1.1,order2.1)).await;
+    if let Ok(handle) = handle {
+        let res = handle
+            .commit_timeout(std::time::Duration::from_secs(180))
+            .wait_for_commit()
+            .await;
+        println!("res:{:?}", res);
+    } else {
+        println!("err:{:?}", handle);
+    }
 }
 
 pub fn init_log(log_level: &str){

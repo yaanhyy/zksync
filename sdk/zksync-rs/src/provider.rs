@@ -12,7 +12,7 @@ use num::BigUint;
 // Workspace uses
 use zksync_types::{
     network::Network,
-    tx::{PackedEthSignature, TxHash, ZkSyncTx},
+    tx::{PackedEthSignature,  TxHash, ZkSyncTx},
     Address, TokenLike, TxFeeTypes,
 };
 
@@ -82,6 +82,12 @@ pub trait Provider {
         &self,
         tx: ZkSyncTx,
         eth_signature: Option<PackedEthSignature>,
+    ) -> ResponseResult<TxHash>;
+
+    async fn send_swap_tx(
+        &self,
+        tx: ZkSyncTx,
+        eth_signature: Option<Vec<Option<PackedEthSignature>>>,
     ) -> ResponseResult<TxHash>;
 
     /// Submits a batch of transactions to the zkSync network.
@@ -169,6 +175,15 @@ impl Provider for RpcProvider {
         eth_signature: Option<PackedEthSignature>,
     ) -> ResponseResult<TxHash> {
         let msg = JsonRpcRequest::submit_tx(tx, eth_signature);
+        self.send_and_deserialize(&msg).await
+    }
+
+    async fn send_swap_tx(
+        &self,
+        tx: ZkSyncTx,
+        eth_signature: Option<Vec<Option<PackedEthSignature>>>,
+    ) -> ResponseResult<TxHash> {
+        let msg = JsonRpcRequest::submit_swap_tx(tx, eth_signature);
         self.send_and_deserialize(&msg).await
     }
 
@@ -322,7 +337,7 @@ impl RpcProvider {
 mod messages {
     use serde::Serialize;
     use zksync_types::{
-        tx::{PackedEthSignature, TxEthSignature, TxHash, ZkSyncTx},
+        tx::{PackedEthSignature, TxEthSignature, TxEthSignatureVariant,  TxHash, ZkSyncTx},
         Address, TokenLike, TxFeeTypes,
     };
 
@@ -368,6 +383,19 @@ mod messages {
 
         pub fn submit_tx(tx: ZkSyncTx, eth_signature: Option<PackedEthSignature>) -> Self {
             let params = json_values![tx, eth_signature.map(TxEthSignature::EthereumSignature)];
+            Self::create("tx_submit", params)
+        }
+
+        pub fn submit_swap_tx(tx: ZkSyncTx, mut eth_signature: Option<Vec<Option<PackedEthSignature>>>) -> Self {
+            let mut eth_sigs = eth_signature.unwrap();
+            let mut sig1= (eth_sigs.get(0).unwrap()).clone();
+            let mut sig_1 = sig1.map(TxEthSignature::EthereumSignature);
+            let mut sig2= (eth_sigs.get(1).unwrap()).clone();
+            let mut sig_2 = sig2.map(TxEthSignature::EthereumSignature);
+            let mut sig3= (eth_sigs.get(2).unwrap()).clone();
+            let mut sig_3 = sig3.map(TxEthSignature::EthereumSignature);
+            let sigs = TxEthSignatureVariant::Triple(sig_1, sig_2, sig_3);
+            let params = json_values![tx, sigs];
             Self::create("tx_submit", params)
         }
 
